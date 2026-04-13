@@ -3,7 +3,7 @@ set -e
 
 METHOD=${1:-testflight}
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEAM_ID=${DEVELOPMENT_TEAM:-BBT2D26L2V}
+TEAM_ID=${DEVELOPMENT_TEAM:-J32AD5KDR3}
 ARCHIVE_PATH=${ARCHIVE_PATH:-build/VC.xcarchive}
 EXPORT_PATH=${EXPORT_PATH:-build/ipa}
 EXPORT_OPTIONS_PLIST=${EXPORT_OPTIONS_PLIST:-"ExportOptions-${METHOD}.plist"}

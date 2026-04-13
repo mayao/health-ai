@@ -9,9 +9,6 @@
 /* Begin PBXBuildFile section */
 		02D587394971AB2730C35379 /* DataHubViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3B0686F248921DA6F1011A /* DataHubViewModel.swift */; };
 		09ABB225F3FD7FC3761B7B6A /* AppSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6BCFFC8EC7012A1EC671C7 /* AppSettingsStore.swift */; };
-		A3F2E1D0C9B8A7F6E5D4C3B2 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* AuthManager.swift */; };
-		F2E1D0C9B8A7F6E5D4C3B2A1 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* KeychainHelper.swift */; };
-		B4A3F2E1D0C9B8A7F6E5D4C3 /* LoginScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* LoginScreen.swift */; };
 		44BCA45F9163D6A8A8F80D6E /* TrendDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09124E6AD71222352443FB24 /* TrendDetailScreen.swift */; };
 		569150252F8AEC1CC12F7489 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914A0398AC10A98207289624 /* HomeScreen.swift */; };
 		5BEF5DE7EA220E5542A848E4 /* VitalCommandIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1C9E242D8B95EF62C2D646 /* VitalCommandIOSApp.swift */; };
@@ -20,18 +17,8 @@
 		8C23DFBFF56AF9726E8AB9A4 /* ReportsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C95713B3C6710BE4BF05C702 /* ReportsScreen.swift */; };
 		962DE6B25FA89DEC0F8693AB /* HealthKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F7D21475FECF71AB44D598A /* HealthKitSyncService.swift */; };
 		A248CF7ABCFDA6F0DC3E9B3F /* UIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370B17794FB5436AB4C78103 /* UIComponents.swift */; };
+		A3F2E1D0C9B8A7F6E5D4C3B2 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* AuthManager.swift */; };
 		A71FC6D666C277499C0735D9 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3BD030B66EC2B3B467B95AA /* SettingsScreen.swift */; };
-		AD7B865FF63E011CF60828A3 /* TrendsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83976B1022A3925846CE52FE /* TrendsViewModel.swift */; };
-		B46CBA158D38970542340FE6 /* ReportDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A280331C88DD6396537857BE /* ReportDetailScreen.swift */; };
-		B4C8692BF64B4D67DA83A77C /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE421D7AE650F346CA36F8EB /* HomeViewModel.swift */; };
-		BBC5794847B0DCF72EA64F86 /* ReportsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E0D83F67053E2D62FB62A6 /* ReportsViewModel.swift */; };
-		BBEF01792580FBADD4EF97DC /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF8909CB9F3C413BBBDA1CF /* MainTabView.swift */; };
-		D9833C58EE9DA14CC707CF3D /* LoadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140BFC2163F429B009003422 /* LoadState.swift */; };
-		DCC06E9159400E9A8C46B013 /* TrendsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B1C51D7033F8BE4303E4CB /* TrendsScreen.swift */; };
-		DCDA8E6A87F620F2875EBCFA /* LocalNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DAFCD3DDDB2309C6B271F23 /* LocalNotificationManager.swift */; };
-		E1ADC4D58E0A906974789A06 /* VitalCommandMobileCore in Frameworks */ = {isa = PBXBuildFile; productRef = A817E6D02B60FA6433342271 /* VitalCommandMobileCore */; };
-		EC5F9FFEB96DD6BF76F1D04C /* ReportDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE9C19DFD0758AEB7EEC723 /* ReportDetailViewModel.swift */; };
-		FE7F7A20F689F4BEBD53367B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6D889B4FCAECC76163D09401 /* Assets.xcassets */; };
 		AA2B3C4D5E6F7A8B9C0D0001 /* AutoSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F6A7B8C9D0001 /* AutoSyncCoordinator.swift */; };
 		AA2B3C4D5E6F7A8B9C0D0002 /* HealthPlanScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F6A7B8C9D0002 /* HealthPlanScreen.swift */; };
 		AA2B3C4D5E6F7A8B9C0D0003 /* HealthPlanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F6A7B8C9D0003 /* HealthPlanViewModel.swift */; };
@@ -39,14 +26,24 @@
 		AA2B3C4D5E6F7A8B9C0D0005 /* SuggestionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F6A7B8C9D0005 /* SuggestionCard.swift */; };
 		AA2B3C4D5E6F7A8B9C0D0007 /* CalendarIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F6A7B8C9D0007 /* CalendarIntegration.swift */; };
 		AA2B3C4D5E6F7A8B9C0D0011 /* PlanCustomizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F6A7B8C9D0010 /* PlanCustomizeSheet.swift */; };
+		AD7B865FF63E011CF60828A3 /* TrendsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83976B1022A3925846CE52FE /* TrendsViewModel.swift */; };
+		B46CBA158D38970542340FE6 /* ReportDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A280331C88DD6396537857BE /* ReportDetailScreen.swift */; };
+		B4A3F2E1D0C9B8A7F6E5D4C3 /* LoginScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* LoginScreen.swift */; };
+		B4C8692BF64B4D67DA83A77C /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE421D7AE650F346CA36F8EB /* HomeViewModel.swift */; };
+		BBC5794847B0DCF72EA64F86 /* ReportsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E0D83F67053E2D62FB62A6 /* ReportsViewModel.swift */; };
+		BBEF01792580FBADD4EF97DC /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF8909CB9F3C413BBBDA1CF /* MainTabView.swift */; };
 		CC1A2B3C4D5E6F7A8B9C0D01 /* ServerDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0A1B2C3D4E5F6A7B8C9D01 /* ServerDiscoveryService.swift */; };
+		D9833C58EE9DA14CC707CF3D /* LoadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140BFC2163F429B009003422 /* LoadState.swift */; };
+		DCC06E9159400E9A8C46B013 /* TrendsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B1C51D7033F8BE4303E4CB /* TrendsScreen.swift */; };
+		DCDA8E6A87F620F2875EBCFA /* LocalNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DAFCD3DDDB2309C6B271F23 /* LocalNotificationManager.swift */; };
+		E1ADC4D58E0A906974789A06 /* VitalCommandMobileCore in Frameworks */ = {isa = PBXBuildFile; productRef = A817E6D02B60FA6433342271 /* VitalCommandMobileCore */; };
+		EC5F9FFEB96DD6BF76F1D04C /* ReportDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE9C19DFD0758AEB7EEC723 /* ReportDetailViewModel.swift */; };
+		F2E1D0C9B8A7F6E5D4C3B2A1 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* KeychainHelper.swift */; };
+		FE7F7A20F689F4BEBD53367B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6D889B4FCAECC76163D09401 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		09124E6AD71222352443FB24 /* TrendDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendDetailScreen.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
-		B2C3D4E5F6A7B8C9D0E1F2A3 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
-		C3D4E5F6A7B8C9D0E1F2A3B4 /* LoginScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginScreen.swift; sourceTree = "<group>"; };
 		140BFC2163F429B009003422 /* LoadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadState.swift; sourceTree = "<group>"; };
 		1CF4C9AEA75AA6D118923909 /* VitalCommandIOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VitalCommandIOS.entitlements; sourceTree = "<group>"; };
 		1F7D21475FECF71AB44D598A /* HealthKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitSyncService.swift; sourceTree = "<group>"; };
@@ -54,22 +51,16 @@
 		2D8057FB10B0A5F57F22012C /* DocumentTextExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTextExtractor.swift; sourceTree = "<group>"; };
 		2F3B0686F248921DA6F1011A /* DataHubViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataHubViewModel.swift; sourceTree = "<group>"; };
 		31E0D83F67053E2D62FB62A6 /* ReportsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsViewModel.swift; sourceTree = "<group>"; };
-		35CA740698828C50018496FC /* VitalCommandIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VitalCommandIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		35CA740698828C50018496FC /* VitalCommandIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VitalCommandIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		370B17794FB5436AB4C78103 /* UIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIComponents.swift; sourceTree = "<group>"; };
 		4CF8909CB9F3C413BBBDA1CF /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		6D889B4FCAECC76163D09401 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6DAFCD3DDDB2309C6B271F23 /* LocalNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalNotificationManager.swift; sourceTree = "<group>"; };
 		83976B1022A3925846CE52FE /* TrendsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsViewModel.swift; sourceTree = "<group>"; };
 		914A0398AC10A98207289624 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		A280331C88DD6396537857BE /* ReportDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportDetailScreen.swift; sourceTree = "<group>"; };
 		A3BD030B66EC2B3B467B95AA /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
-		BB1C9E242D8B95EF62C2D646 /* VitalCommandIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalCommandIOSApp.swift; sourceTree = "<group>"; };
-		C95713B3C6710BE4BF05C702 /* ReportsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsScreen.swift; sourceTree = "<group>"; };
-		DE6BCFFC8EC7012A1EC671C7 /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsStore.swift; sourceTree = "<group>"; };
-		E0B1C51D7033F8BE4303E4CB /* TrendsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsScreen.swift; sourceTree = "<group>"; };
-		E5E0F9A7EC83CF5D17F500CC /* VitalCommandMobileCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = VitalCommandMobileCore; path = VitalCommandMobileCore; sourceTree = SOURCE_ROOT; };
-		EE421D7AE650F346CA36F8EB /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
-		FAE9C19DFD0758AEB7EEC723 /* ReportDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportDetailViewModel.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F6A7B8C9D0001 /* AutoSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoSyncCoordinator.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F6A7B8C9D0002 /* HealthPlanScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthPlanScreen.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F6A7B8C9D0003 /* HealthPlanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthPlanViewModel.swift; sourceTree = "<group>"; };
@@ -77,7 +68,16 @@
 		AA1B2C3D4E5F6A7B8C9D0005 /* SuggestionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionCard.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F6A7B8C9D0007 /* CalendarIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarIntegration.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F6A7B8C9D0010 /* PlanCustomizeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCustomizeSheet.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		BB1C9E242D8B95EF62C2D646 /* VitalCommandIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalCommandIOSApp.swift; sourceTree = "<group>"; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* LoginScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginScreen.swift; sourceTree = "<group>"; };
+		C95713B3C6710BE4BF05C702 /* ReportsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsScreen.swift; sourceTree = "<group>"; };
 		CC0A1B2C3D4E5F6A7B8C9D01 /* ServerDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerDiscoveryService.swift; sourceTree = "<group>"; };
+		DE6BCFFC8EC7012A1EC671C7 /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsStore.swift; sourceTree = "<group>"; };
+		E0B1C51D7033F8BE4303E4CB /* TrendsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsScreen.swift; sourceTree = "<group>"; };
+		E5E0F9A7EC83CF5D17F500CC /* VitalCommandMobileCore */ = {isa = PBXFileReference; lastKnownFileType = folder; path = VitalCommandMobileCore; sourceTree = SOURCE_ROOT; };
+		EE421D7AE650F346CA36F8EB /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		FAE9C19DFD0758AEB7EEC723 /* ReportDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportDetailViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,16 +92,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		D4E5F6A7B8C9D0E1F2A3B4C5 /* Auth */ = {
-			isa = PBXGroup;
-			children = (
-				B2C3D4E5F6A7B8C9D0E1F2A3 /* AuthManager.swift */,
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* KeychainHelper.swift */,
-				C3D4E5F6A7B8C9D0E1F2A3B4 /* LoginScreen.swift */,
-			);
-			path = Auth;
-			sourceTree = "<group>";
-		};
 		4575C84C372F1C89860AFD0A /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -179,17 +169,7 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		CFDA961D5929E7FFEDA16D50 /* Trends */ = {
-			isa = PBXGroup;
-			children = (
-				09124E6AD71222352443FB24 /* TrendDetailScreen.swift */,
-				E0B1C51D7033F8BE4303E4CB /* TrendsScreen.swift */,
-				83976B1022A3925846CE52FE /* TrendsViewModel.swift */,
-			);
-			path = Trends;
-			sourceTree = "<group>";
-		};
-			AA1B2C3D4E5F6A7B8C9D0006 /* HealthPlan */ = {
+		AA1B2C3D4E5F6A7B8C9D0006 /* HealthPlan */ = {
 			isa = PBXGroup;
 			children = (
 				AA1B2C3D4E5F6A7B8C9D0007 /* CalendarIntegration.swift */,
@@ -200,6 +180,26 @@
 				AA1B2C3D4E5F6A7B8C9D0005 /* SuggestionCard.swift */,
 			);
 			path = HealthPlan;
+			sourceTree = "<group>";
+		};
+		CFDA961D5929E7FFEDA16D50 /* Trends */ = {
+			isa = PBXGroup;
+			children = (
+				09124E6AD71222352443FB24 /* TrendDetailScreen.swift */,
+				E0B1C51D7033F8BE4303E4CB /* TrendsScreen.swift */,
+				83976B1022A3925846CE52FE /* TrendsViewModel.swift */,
+			);
+			path = Trends;
+			sourceTree = "<group>";
+		};
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* AuthManager.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* KeychainHelper.swift */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* LoginScreen.swift */,
+			);
+			path = Auth;
 			sourceTree = "<group>";
 		};
 		DAFB80456C376634673C6404 /* Features */ = {
@@ -270,7 +270,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					F7E2753C6D43CC4648B4E3C8 = {
-						DevelopmentTeam = J32AD5KDR3;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -356,6 +355,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = VitalCommandIOS/VitalCommandIOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = J32AD5KDR3;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -371,6 +371,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = VitalCommandIOS/VitalCommandIOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = J32AD5KDR3;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -417,8 +418,9 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2026041301;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = BBT2D26L2V;
+				DEVELOPMENT_TEAM = J32AD5KDR3;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -431,30 +433,22 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health AI";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "HealthAI 需要访问日历来创建健康计划提醒事件，帮助你按时完成健康目标。";
 				INFOPLIST_KEY_NSCameraUsageDescription = "HealthAI 需要访问相机来拍摄体检报告或化验单，用于数据上传与分析。";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "HealthAI 使用面容 ID 快速验证身份登录。";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "HealthAI 需要读取 Apple 健康中的睡眠、运动、步数和身体组成数据，用于更新你的健康趋势与 AI 分析。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "HealthAI 需要写入健康数据以记录你的健康计划完成情况和自动同步的指标数据。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HealthAI 需要访问麦克风来进行语音输入，将语音转换为文字与 AI 助手对话。";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "HealthAI 需要访问日历来创建健康计划提醒事件，帮助你按时完成健康目标。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "HealthAI 需要语音识别功能来将你的语音转换为文字，方便与 AI 健康助手对话。";
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
-					UIInterfaceOrientationPortrait,
-					UIInterfaceOrientationPortraitUpsideDown,
-					UIInterfaceOrientationLandscapeLeft,
-					UIInterfaceOrientationLandscapeRight,
-				);
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = (
-					UIInterfaceOrientationPortrait,
-				);
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0.1;
-				CURRENT_PROJECT_VERSION = 2026041301;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xihe.healthai;
@@ -503,8 +497,9 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2026041301;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = BBT2D26L2V;
+				DEVELOPMENT_TEAM = J32AD5KDR3;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -523,30 +518,22 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Health AI";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "HealthAI 需要访问日历来创建健康计划提醒事件，帮助你按时完成健康目标。";
 				INFOPLIST_KEY_NSCameraUsageDescription = "HealthAI 需要访问相机来拍摄体检报告或化验单，用于数据上传与分析。";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "HealthAI 使用面容 ID 快速验证身份登录。";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "HealthAI 需要读取 Apple 健康中的睡眠、运动、步数和身体组成数据，用于更新你的健康趋势与 AI 分析。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "HealthAI 需要写入健康数据以记录你的健康计划完成情况和自动同步的指标数据。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "HealthAI 需要访问麦克风来进行语音输入，将语音转换为文字与 AI 助手对话。";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "HealthAI 需要访问日历来创建健康计划提醒事件，帮助你按时完成健康目标。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "HealthAI 需要语音识别功能来将你的语音转换为文字，方便与 AI 健康助手对话。";
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
-					UIInterfaceOrientationPortrait,
-					UIInterfaceOrientationPortraitUpsideDown,
-					UIInterfaceOrientationLandscapeLeft,
-					UIInterfaceOrientationLandscapeRight,
-				);
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = (
-					UIInterfaceOrientationPortrait,
-				);
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0.1;
-				CURRENT_PROJECT_VERSION = 2026041301;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
