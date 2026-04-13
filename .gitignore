@@ -1,0 +1,17 @@
+node_modules
+.next
+dist
+coverage
+tsconfig.tsbuildinfo
+data/
+npm-debug.log*
+.env
+.env.local
+.env.*.local
+build/
+output/
+logs/
+ios/build/
+*.xcuserdata
+.DS_Store
+deploy/.env*

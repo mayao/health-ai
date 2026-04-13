@@ -1,0 +1,19 @@
+[Unit]
+Description=Health AI service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__RUN_AS_USER__
+WorkingDirectory=__WORKDIR__
+EnvironmentFile=-__WORKDIR__/.env
+ExecStart=__WORKDIR__/scripts/run-health-server.sh
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=HOSTNAME=0.0.0.0
+
+[Install]
+WantedBy=multi-user.target

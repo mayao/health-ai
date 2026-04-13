@@ -1,0 +1,46 @@
+{
+  "name": "personal-health-ops",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "predev": "node scripts/check-runtime.mjs",
+    "dev": "next dev",
+    "prebuild": "node scripts/check-runtime.mjs",
+    "build": "next build",
+    "prestart": "node scripts/check-runtime.mjs",
+    "start": "node .next/standalone/server.js",
+    "prelint": "node scripts/check-runtime.mjs",
+    "lint": "eslint .",
+    "pretypecheck": "node scripts/check-runtime.mjs",
+    "typecheck": "tsc --noEmit",
+    "pretest": "node scripts/check-runtime.mjs",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "db:inspect": "node --import tsx scripts/inspect-db.ts",
+    "migrate": "node --import tsx scripts/migrate.ts",
+    "db:unified": "node --import tsx scripts/describe-unified-schema.ts",
+    "import:demo": "node --import tsx scripts/import-demo.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.12.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
