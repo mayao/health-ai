@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getAppEnv } from "../config/env";
 import { getDatabase } from "../db/sqlite";
 import { getHealthHomePageData } from "./health-home-service";
+import { resolveAnthropicMessagesUrl } from "../llm/anthropic-messages-url";
 import { getKimiOpenAIHeaders, getProviderPriority } from "./llm-provider-routing";
 import { getUserPreferredProvider } from "./llm-preference-service";
 
@@ -132,8 +133,7 @@ async function requestAnthropicReply(
   baseUrl: string = "https://api.anthropic.com/v1/messages"
 ) {
   const systemPrompt = buildSystemPrompt(payload);
-  const base = baseUrl.replace(/\/$/, "");
-  const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
+  const messageURL = resolveAnthropicMessagesUrl(baseUrl);
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45_000);
@@ -662,8 +662,7 @@ async function openAnthropicStreamingRequest(
   messages: HealthAIChatRequest["messages"],
   baseUrl: string = "https://api.anthropic.com/v1/messages"
 ): Promise<ReadableStream<Uint8Array>> {
-  const base = baseUrl.replace(/\/$/, "");
-  const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
+  const messageURL = resolveAnthropicMessagesUrl(baseUrl);
   const ctrl = new AbortController();
   const connectTimeout = setTimeout(() => ctrl.abort(), 30_000);
   const response = await fetch(messageURL, {

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 
 import { getAppEnv } from "../config/env";
+import { resolveAnthropicMessagesUrl } from "../llm/anthropic-messages-url";
 import {
   getKimiOpenAIHeaders,
   getProviderPriority,
@@ -116,8 +117,9 @@ async function callAnthropicVision(params: {
   baseUrl?: string;
   timeoutMs: number;
 }): Promise<ProviderResult> {
-  const base = (params.baseUrl ?? "https://api.anthropic.com/v1/messages").replace(/\/$/, "");
-  const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
+  const messageURL = resolveAnthropicMessagesUrl(
+    params.baseUrl ?? "https://api.anthropic.com/v1/messages"
+  );
   const response = await fetch(messageURL, {
     method: "POST",
     signal: AbortSignal.timeout(params.timeoutMs),

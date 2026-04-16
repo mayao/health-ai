@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { getAppEnv } from "../config/env";
 import { getDatabase } from "../db/sqlite";
+import { resolveAnthropicMessagesUrl } from "../llm/anthropic-messages-url";
 import { getHealthHomePageData } from "./health-home-service";
 
 export interface AIOverviewResult {
@@ -128,8 +129,7 @@ async function callKimiDirect(
   const kimiBaseUrl = process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL;
   if (kimiBaseUrl) {
     try {
-      const base = kimiBaseUrl.replace(/\/$/, "");
-      const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
+      const messageURL = resolveAnthropicMessagesUrl(kimiBaseUrl);
       const response = await fetch(messageURL, {
         method: "POST",
         headers: {
@@ -216,8 +216,9 @@ async function callAnthropicDirect(
   if (env.HEALTH_LLM_PROVIDER !== "anthropic" || !env.HEALTH_LLM_API_KEY) return null;
 
   const model = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
-  const base = (env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages").replace(/\/$/, "");
-  const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
+  const messageURL = resolveAnthropicMessagesUrl(
+    env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages"
+  );
 
   try {
     const ctrl = new AbortController();
@@ -275,8 +276,7 @@ async function callAnthropicGatewayDirect(
       : process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
   if (!(key && baseUrl)) return null;
 
-  const base = baseUrl.replace(/\/$/, "");
-  const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
+  const messageURL = resolveAnthropicMessagesUrl(baseUrl);
 
   try {
     const response = await fetch(messageURL, {

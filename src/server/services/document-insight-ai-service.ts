@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { getAppEnv } from "../config/env";
 import { getDatabase } from "../db/sqlite";
+import { resolveAnthropicMessagesUrl } from "../llm/anthropic-messages-url";
 import { getKimiOpenAIHeaders, getProviderPriority } from "./llm-provider-routing";
 import {
   getAnnualExamDigest,
@@ -263,8 +264,7 @@ async function callAnthropicForInsights(
   model: string,
   baseUrl: string = "https://api.anthropic.com/v1/messages"
 ): Promise<{ text: string; model: string }> {
-  const resolvedBase = baseUrl.replace(/\/$/, "");
-  const messageURL = resolvedBase.endsWith("/messages") ? resolvedBase : `${resolvedBase}/messages`;
+  const messageURL = resolveAnthropicMessagesUrl(baseUrl);
   const response = await fetch(messageURL, {
     method: "POST",
     headers: {
