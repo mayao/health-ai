@@ -784,7 +784,7 @@ test("diet importer estimates calories when model omits numeric calories field",
   }
 });
 
-test("diet importer falls back to gemini when the primary vision provider fails", async () => {
+test("diet importer falls back to kimi when the primary vision provider fails", async () => {
   const database = setupDatabase();
   const temp = writeTempFile("diet-fallback.jpg", "fake-image-content");
   const dataSourceId = ensureDataSource(database, "user-self", {
@@ -811,7 +811,7 @@ test("diet importer falls back to gemini when the primary vision provider fails"
       return new Response("upstream error", { status: 500 }) as Response;
     }
 
-    if (url.includes("generativelanguage.googleapis.com")) {
+    if (url.includes("moonshot.cn") || url.includes("kimi.com")) {
       return new Response(
         JSON.stringify({
           choices: [
@@ -824,7 +824,7 @@ test("diet importer falls back to gemini when the primary vision provider fails"
               }
             }
           ],
-          model: "gemini-vision-mock"
+          model: "kimi-vision-mock"
         }),
         {
           status: 200,
@@ -842,8 +842,8 @@ test("diet importer falls back to gemini when the primary vision provider fails"
         HEALTH_LLM_PROVIDER: "anthropic",
         HEALTH_LLM_API_KEY: "anthropic-key",
         HEALTH_LLM_MODEL: "claude-opus-test",
-        HEALTH_LLM_FALLBACK_GEMINI_KEY: "gemini-key",
-        HEALTH_LLM_FALLBACK_GEMINI_MODEL: "gemini-2.5-flash"
+        HEALTH_LLM_FALLBACK_KIMI_KEY: "sk-test-kimi-fallback",
+        HEALTH_LLM_FALLBACK_KIMI_MODEL: "kimi-latest"
       },
       () =>
         importDietData(database, {

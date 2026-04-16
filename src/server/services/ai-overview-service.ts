@@ -213,7 +213,8 @@ async function callAnthropicDirect(
   userPrompt: string
 ): Promise<{ text: string; provider: string; model: string } | null> {
   const env = getAppEnv();
-  if (env.HEALTH_LLM_PROVIDER !== "anthropic" || !env.HEALTH_LLM_API_KEY) return null;
+  if (!env.HEALTH_LLM_API_KEY) return null;
+  if (env.HEALTH_LLM_PROVIDER && env.HEALTH_LLM_PROVIDER !== "anthropic") return null;
 
   const model = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
   const messageURL = resolveAnthropicMessagesUrl(
@@ -257,23 +258,13 @@ async function callAnthropicDirect(
   return null;
 }
 
-async function callAnthropicGatewayDirect(
-  provider: "glm" | "minimax",
+async function callMinimaxGatewayDirect(
   systemPrompt: string,
   userPrompt: string
 ): Promise<{ text: string; provider: string; model: string } | null> {
-  const key =
-    provider === "glm"
-      ? process.env.HEALTH_LLM_FALLBACK_GLM_KEY
-      : process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
-  const model =
-    provider === "glm"
-      ? (process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5")
-      : (process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped");
-  const baseUrl =
-    provider === "glm"
-      ? process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL
-      : process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
+  const key = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
+  const model = process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped";
+  const baseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
   if (!(key && baseUrl)) return null;
 
   const messageURL = resolveAnthropicMessagesUrl(baseUrl);
@@ -295,16 +286,16 @@ async function callAnthropicGatewayDirect(
       })
     });
 
-    if (!response.ok) throw new Error(`${provider} API ${response.status}`);
+    if (!response.ok) throw new Error(`minimax API ${response.status}`);
     const data = (await response.json()) as {
       content?: Array<{ type: string; text?: string }>;
       model?: string;
     };
     const text = data.content?.find((c) => c.type === "text")?.text?.trim();
-    if (text) return { text, provider, model: data.model ?? model };
+    if (text) return { text, provider: "minimax", model: data.model ?? model };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.warn(`[AI Overview] ${provider} failed: ${msg}`);
+    console.warn(`[AI Overview] minimax failed: ${msg}`);
   }
   return null;
 }
@@ -360,7 +351,7 @@ export async function generateAIOverview(
   const payload = await getHealthHomePageData(database, userId);
   const userProfile = buildUserProfileForLLM(payload);
 
-  // Try Claude/Anthropic first, then Kimi, GLM, MiniMax.
+  // Try Claude/Anthropic first, then Kimi, then MiniMax (Anthropic-compatible gateway).
   let llmResult: { text: string; provider: string; model: string } | null = null;
 
   llmResult = await callAnthropicDirect(SYSTEM_PROMPT, userProfile);
@@ -368,10 +359,7 @@ export async function generateAIOverview(
     llmResult = await callKimiDirect(SYSTEM_PROMPT, userProfile);
   }
   if (!llmResult) {
-    llmResult = await callAnthropicGatewayDirect("glm", SYSTEM_PROMPT, userProfile);
-  }
-  if (!llmResult) {
-    llmResult = await callAnthropicGatewayDirect("minimax", SYSTEM_PROMPT, userProfile);
+    llmResult = await callMinimaxGatewayDirect(SYSTEM_PROMPT, userProfile);
   }
 
   if (llmResult) {

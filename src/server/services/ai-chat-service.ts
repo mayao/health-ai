@@ -279,14 +279,6 @@ async function requestProviderReply(
         );
       }
 
-      if (provider === "glm") {
-        const apiKey = process.env.HEALTH_LLM_FALLBACK_GLM_KEY;
-        const baseUrl = process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL;
-        const model = process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5";
-        if (!(apiKey && baseUrl)) continue;
-        return await requestAnthropicReply(request, payload, apiKey, model, baseUrl);
-      }
-
       if (provider === "minimax") {
         const apiKey = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
         const baseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
@@ -303,15 +295,6 @@ async function requestProviderReply(
         return await requestOpenAICompatibleReply(request, payload, apiKey, baseUrl, model);
       }
 
-      if (provider === "gemini") {
-        const apiKey = process.env.HEALTH_LLM_FALLBACK_GEMINI_KEY;
-        const model = process.env.HEALTH_LLM_FALLBACK_GEMINI_MODEL ?? "gemini-2.5-flash";
-        if (!apiKey) continue;
-        return await requestOpenAICompatibleReply(
-          request, payload, apiKey,
-          "https://generativelanguage.googleapis.com/v1beta/openai", model
-        );
-      }
     } catch (error) {
       console.warn(`[AI Chat] Provider ${provider} failed:`, error instanceof Error ? error.message : error);
       continue;
@@ -465,19 +448,6 @@ export async function streamHealthAIReply(
       continue;
     }
 
-    if (provider === "glm") {
-      const glmKey = process.env.HEALTH_LLM_FALLBACK_GLM_KEY;
-      const glmModel = process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5";
-      const glmBaseUrl = process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL;
-      if (!(glmKey && glmBaseUrl)) continue;
-      raceCandidates.push(
-        openAnthropicStreamingRequest(glmKey, glmModel, systemPrompt, request.messages, glmBaseUrl)
-          .then(stream => ({ stream, provider: "glm", model: glmModel }))
-          .catch(e => { console.warn("[AI Chat Stream] glm failed:", e instanceof Error ? e.message : e); throw e; })
-      );
-      continue;
-    }
-
     if (provider === "minimax") {
       const minimaxKey = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
       const minimaxModel = process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped";
@@ -492,7 +462,8 @@ export async function streamHealthAIReply(
     }
 
     if (provider === "anthropic") {
-      const anthropicKey = env.HEALTH_LLM_PROVIDER === "anthropic" ? env.HEALTH_LLM_API_KEY : undefined;
+      const anthropicKey =
+        !env.HEALTH_LLM_PROVIDER || env.HEALTH_LLM_PROVIDER === "anthropic" ? env.HEALTH_LLM_API_KEY : undefined;
       if (!anthropicKey) continue;
       const anthropicModel = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
       const anthropicBaseUrl = env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages";
@@ -517,16 +488,6 @@ export async function streamHealthAIReply(
       continue;
     }
 
-    if (provider === "gemini") {
-      const geminiKey = process.env.HEALTH_LLM_FALLBACK_GEMINI_KEY;
-      if (!geminiKey) continue;
-      const geminiModel = process.env.HEALTH_LLM_FALLBACK_GEMINI_MODEL ?? "gemini-2.5-flash";
-      raceCandidates.push(
-        openStreamingRequest("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", geminiKey, geminiModel, systemPrompt, request.messages)
-          .then(stream => ({ stream, provider: "gemini", model: geminiModel }))
-          .catch(e => { console.warn("[AI Chat Stream] gemini failed:", e instanceof Error ? e.message : e); throw e; })
-      );
-    }
   }
 
   if (raceCandidates.length > 0) {

@@ -1,20 +1,14 @@
 import type { AppEnv } from "../config/env";
 
-export type LLMProviderName =
-  | "anthropic"
-  | "openai_compatible"
-  | "kimi"
-  | "glm"
-  | "minimax"
-  | "gemini";
+import { resolveAnthropicMessagesUrl } from "../llm/anthropic-messages-url";
+
+export type LLMProviderName = "anthropic" | "openai_compatible" | "kimi" | "minimax";
 
 export const BASE_PROVIDER_ORDER: LLMProviderName[] = [
   "anthropic",
   "kimi",
-  "glm",
   "minimax",
-  "openai_compatible",
-  "gemini"
+  "openai_compatible"
 ];
 
 export function isKimiCodingKey(apiKey?: string | null): boolean {
@@ -37,8 +31,6 @@ export function isProviderConfigured(provider: LLMProviderName, env: AppEnv): bo
           process.env.HEALTH_LLM_FALLBACK_KIMI_KEY.startsWith("sk-")
         )
       );
-    case "glm":
-      return !!(process.env.HEALTH_LLM_FALLBACK_GLM_KEY && process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL);
     case "minimax":
       return !!(
         process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY &&
@@ -48,13 +40,11 @@ export function isProviderConfigured(provider: LLMProviderName, env: AppEnv): bo
       return !!(env.HEALTH_LLM_API_KEY && (!env.HEALTH_LLM_PROVIDER || env.HEALTH_LLM_PROVIDER === "anthropic"));
     case "openai_compatible":
       return !!(env.HEALTH_LLM_API_KEY && env.HEALTH_LLM_PROVIDER === "openai-compatible" && env.HEALTH_LLM_BASE_URL);
-    case "gemini":
-      return !!process.env.HEALTH_LLM_FALLBACK_GEMINI_KEY;
   }
 }
 
 export function getDefaultPrimaryProvider(env: AppEnv): LLMProviderName | null {
-  return BASE_PROVIDER_ORDER.find((provider) => isProviderConfigured(provider, env)) ?? null;
+  return BASE_PROVIDER_ORDER.find((p) => isProviderConfigured(p, env)) ?? null;
 }
 
 export function getProviderPriority(
@@ -62,14 +52,14 @@ export function getProviderPriority(
   preferredProvider?: string | null
 ): LLMProviderName[] {
   const preferred = BASE_PROVIDER_ORDER.find(
-    (provider) => provider === preferredProvider && isProviderConfigured(provider, env)
+    (p) => p === preferredProvider && isProviderConfigured(p, env)
   );
 
   const ordered = preferred
-    ? [preferred, ...BASE_PROVIDER_ORDER.filter((provider) => provider !== preferred)]
+    ? [preferred, ...BASE_PROVIDER_ORDER.filter((p) => p !== preferred)]
     : BASE_PROVIDER_ORDER;
 
-  return ordered.filter((provider) => isProviderConfigured(provider, env));
+  return ordered.filter((p) => isProviderConfigured(p, env));
 }
 
 export async function sortProvidersByConnectivity(
@@ -120,20 +110,14 @@ function probeTargetFor(provider: LLMProviderName, env: AppEnv): string | null {
       }
       return kimiKey.startsWith("sk-kimi-") ? "https://api.kimi.com" : "https://api.moonshot.cn";
     }
-    case "glm":
-      return process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL ?? null;
     case "minimax":
       return process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL ?? null;
     case "anthropic":
       if (!isProviderConfigured("anthropic", env)) {
         return null;
       }
-      return env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages";
+      return resolveAnthropicMessagesUrl(env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages");
     case "openai_compatible":
       return env.HEALTH_LLM_BASE_URL ?? null;
-    case "gemini":
-      return isProviderConfigured("gemini", env)
-        ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-        : null;
   }
 }

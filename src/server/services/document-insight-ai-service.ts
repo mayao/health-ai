@@ -323,34 +323,6 @@ async function callKimiForInsights(
   return { text, model: data.model ?? model };
 }
 
-async function callGeminiForInsights(
-  prompt: string,
-  apiKey: string,
-  model: string
-): Promise<{ text: string; model: string }> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 8192 }
-      })
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
-  }
-
-  const data = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  return { text, model };
-}
-
 type LLMProviderFn = () => Promise<{ text: string; provider: string; model: string }>;
 
 export async function callLLMWithFallbacks(
@@ -385,7 +357,9 @@ export async function callLLMWithFallbacks(
   };
 
   const tryAnthropic: LLMProviderFn = async () => {
-    if (!(env.HEALTH_LLM_API_KEY && env.HEALTH_LLM_PROVIDER === "anthropic")) throw new Error("not configured");
+    if (!(env.HEALTH_LLM_API_KEY && (!env.HEALTH_LLM_PROVIDER || env.HEALTH_LLM_PROVIDER === "anthropic"))) {
+      throw new Error("not configured");
+    }
     const model = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
     const baseUrl = env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages";
     const data = await callAnthropicForInsights(prompt, env.HEALTH_LLM_API_KEY, model, baseUrl);
@@ -415,15 +389,6 @@ export async function callLLMWithFallbacks(
     return { text: data.choices?.[0]?.message?.content ?? "", model: data.model ?? model, provider: "kimi" };
   };
 
-  const tryGLM: LLMProviderFn = async () => {
-    const key = process.env.HEALTH_LLM_FALLBACK_GLM_KEY;
-    const baseUrl = process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL;
-    if (!(key && baseUrl)) throw new Error("not configured");
-    const model = process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5";
-    const data = await callAnthropicForInsights(prompt, key, model, baseUrl);
-    return { text: data.text, model: data.model, provider: "glm" };
-  };
-
   const tryMinimax: LLMProviderFn = async () => {
     const key = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
     const baseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
@@ -433,30 +398,11 @@ export async function callLLMWithFallbacks(
     return { text: data.text, model: data.model, provider: "minimax" };
   };
 
-  const tryGemini: LLMProviderFn = async () => {
-    const geminiKey = process.env.HEALTH_LLM_FALLBACK_GEMINI_KEY;
-    if (!geminiKey) throw new Error("not configured");
-    const model = process.env.HEALTH_LLM_FALLBACK_GEMINI_MODEL ?? "gemini-2.5-flash";
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-      {
-        method: "POST", signal: makeSignal(),
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 8192 } })
-      }
-    );
-    if (!response.ok) throw new Error(`Gemini API ${response.status}`);
-    const data = (await response.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    return { text: data.candidates?.[0]?.content?.parts?.[0]?.text ?? "", model, provider: "gemini" };
-  };
-
   const providerMap: Record<string, LLMProviderFn> = {
     anthropic: tryAnthropic,
     openai_compatible: tryOpenAI,
     kimi: tryKimi,
-    glm: tryGLM,
-    minimax: tryMinimax,
-    gemini: tryGemini,
+    minimax: tryMinimax
   };
 
   const order = getProviderPriority(env, options?.preferredProvider);

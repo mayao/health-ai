@@ -5,7 +5,7 @@ public enum NarrativeProviderKind: String, Codable, Sendable {
     case openAICompatible = "openai-compatible"
     case anthropic
     case kimi
-    case gemini
+    case minimax
 }
 
 public enum SummaryPeriodKind: String, Codable, Sendable {
