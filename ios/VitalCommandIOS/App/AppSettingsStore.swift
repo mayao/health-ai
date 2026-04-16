@@ -44,7 +44,7 @@ final class AppSettingsStore: ObservableObject {
     static let publicBackupServerURL = "https://backup.wellai.online/"
     static let remoteServerAURL = "http://10.8.144.16:3001/"
     static let remoteServerBURL = "http://10.8.130.244:3001/"
-    static let currentRemoteServerURL = remoteServerAURL
+    static let currentRemoteServerURL = publicPrimaryServerURL
     static let defaultSimulatorServerURL = "http://127.0.0.1:3000/"
     static let supportEmailAddress = "yao.ma@qq.com"
     static let supportTeamName = "Health AI团队"
@@ -109,8 +109,10 @@ final class AppSettingsStore: ObservableObject {
     private static let legacyServerURLMap: [String: String] = [
         "http://10.8.140.209:3000": publicPrimaryServerURL,
         "http://10.8.140.209:3000/": publicPrimaryServerURL,
-        "http://10.8.144.16:3001": remoteServerAURL,
-        "http://10.8.130.244:3001": remoteServerBURL,
+        "http://10.8.144.16:3001": publicPrimaryServerURL,
+        "http://10.8.144.16:3001/": publicPrimaryServerURL,
+        "http://10.8.130.244:3001": publicBackupServerURL,
+        "http://10.8.130.244:3001/": publicBackupServerURL,
         "http://192.168.31.193:3000": publicPrimaryServerURL,
         "http://192.168.31.193:3000/": publicPrimaryServerURL,
         "https://app.wellai.online": publicPrimaryServerURL,
@@ -205,6 +207,42 @@ final class AppSettingsStore: ObservableObject {
         return HealthAPIClient(configuration: AppServerConfiguration(baseURL: url), token: effectiveToken)
     }
 
+    func shouldAttemptServerFailover(for error: Error) -> Bool {
+        guard let apiError = error as? HealthAPIClientError else {
+            return false
+        }
+
+        switch apiError {
+        case .transport:
+            return true
+        case let .server(statusCode, _):
+            return statusCode >= 500
+        default:
+            return false
+        }
+    }
+
+    func recoverToAvailablePublicServer(after error: Error) async -> Bool {
+        guard shouldAttemptServerFailover(for: error) else {
+            return false
+        }
+
+        let currentURL = normalizedServerURL(trimmedServerURLString)
+        let candidateURLs = orderedFailoverCandidates(excluding: currentURL)
+        guard candidateURLs.isEmpty == false else {
+            return false
+        }
+
+        for candidate in candidateURLs {
+            if await isServerAPIReachable(candidate) {
+                serverURLString = candidate
+                return true
+            }
+        }
+
+        return false
+    }
+
     func markHealthDataChanged() {
         dataRefreshVersion += 1
     }
@@ -282,6 +320,60 @@ final class AppSettingsStore: ObservableObject {
         }
 
         return migrated
+    }
+
+    private func orderedFailoverCandidates(excluding currentURL: String) -> [String] {
+        let preferred = [
+            Self.publicPrimaryServerURL,
+            Self.publicBackupServerURL
+        ]
+        let merged = preferred + Self.builtInServers.map(\.url) + savedServers.map(\.url)
+        var seen = Set<String>()
+        var output: [String] = []
+
+        for rawURL in merged {
+            let normalized = normalizedServerURL(rawURL)
+            guard normalized.isEmpty == false, normalized != currentURL else { continue }
+            guard seen.insert(normalized).inserted else { continue }
+            output.append(normalized)
+        }
+
+        return output
+    }
+
+    private func normalizedServerURL(_ rawURL: String) -> String {
+        let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let url = URL(string: trimmed) else {
+            return ""
+        }
+
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.path = "/"
+        components?.query = nil
+        components?.fragment = nil
+        return components?.url?.absoluteString ?? trimmed
+    }
+
+    private func isServerAPIReachable(_ serverURL: String) async -> Bool {
+        let base = serverURL.hasSuffix("/") ? String(serverURL.dropLast()) : serverURL
+        guard let meURL = URL(string: "\(base)/api/auth/me") else {
+            return false
+        }
+
+        var request = URLRequest(url: meURL)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 5
+        request.setValue("HealthAI-iOS-Reachability", forHTTPHeaderField: "User-Agent")
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return false
+            }
+            return (200...499).contains(httpResponse.statusCode)
+        } catch {
+            return false
+        }
     }
 
     private var resolvedPublicWebBaseURL: URL? {

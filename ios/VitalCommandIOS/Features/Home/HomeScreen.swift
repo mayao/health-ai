@@ -7,6 +7,7 @@ import VitalCommandMobileCore
 struct HomeScreen: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var authManager: AuthManager
+    @EnvironmentObject private var autoSync: AutoSyncCoordinator
     @StateObject private var viewModel = HomeViewModel()
     @State private var activeSheet: HomeSheetDestination?
     @State private var showMedicalExamInsight = false
@@ -14,6 +15,8 @@ struct HomeScreen: View {
     @State private var showDietInsight = false
     @State private var isPulseExpanded = false
     @State private var isTrendExpanded = false
+    @State private var isRequestingAppleHealthAuthorization = false
+    @State private var appleHealthAuthorizationMessage: String?
 
     private var dashboardCacheScope: String {
         authManager.currentUser?.id ?? "anonymous"
@@ -252,6 +255,23 @@ struct HomeScreen: View {
 
             settings.pendingHomeDestination = nil
         }
+        .alert(
+            "Apple 健康授权",
+            isPresented: Binding(
+                get: { appleHealthAuthorizationMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        appleHealthAuthorizationMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button("知道了", role: .cancel) {
+                appleHealthAuthorizationMessage = nil
+            }
+        } message: {
+            Text(appleHealthAuthorizationMessage ?? "")
+        }
     }
 
     @ViewBuilder
@@ -333,6 +353,12 @@ struct HomeScreen: View {
             let client = try settings.makeClient()
             await viewModel.load(using: client, cacheScope: dashboardCacheScope)
 
+            // Main station may intermittently fail; switch to available public server and retry once.
+            if let loadError = viewModel.lastError, await settings.recoverToAvailablePublicServer(after: loadError) {
+                let fallbackClient = try settings.makeClient()
+                await viewModel.load(using: fallbackClient, cacheScope: dashboardCacheScope)
+            }
+
             // If dashboard failed with 401, try device auto-login and retry
             if viewModel.isAuthError {
                 try? await authManager.deviceAutoLogin(using: settings)
@@ -343,6 +369,22 @@ struct HomeScreen: View {
             }
         } catch {
             viewModel.setError(error.localizedDescription)
+        }
+    }
+
+    private func authorizeAppleHealthFromHome() async {
+        guard !isRequestingAppleHealthAuthorization else { return }
+        isRequestingAppleHealthAuthorization = true
+        defer { isRequestingAppleHealthAuthorization = false }
+
+        do {
+            let service = HealthKitSyncService()
+            _ = try await service.fetchSyncSamples(daysBack: 7)
+            autoSync.syncIfNeeded(settings: settings)
+            appleHealthAuthorizationMessage = "Apple 健康授权成功，系统将开始同步并自动刷新首页数据。"
+            await reload()
+        } catch {
+            appleHealthAuthorizationMessage = "授权未完成：\(error.localizedDescription)"
         }
     }
 
@@ -726,18 +768,19 @@ struct HomeScreen: View {
                     tint: Color(hex: "#2563eb") ?? .blue
                 )
             } else {
-                NavigationLink {
-                    DataHubScreen()
+                Button {
+                    Task { await authorizeAppleHealthFromHome() }
                 } label: {
                     analysisEmptyStateCard(
                         icon: "heart.text.square.fill",
                         iconColor: Color(hex: "#2563eb") ?? .blue,
                         title: "先同步 Apple 健康数据",
-                        message: "同步步数、运动时间和睡眠后，这里会自动生成运动与睡眠的联合分析。",
-                        actionTitle: "去同步 Apple 健康"
+                        message: "点击后直接弹出 Apple 健康授权；授权成功后会自动尝试同步，不再先跳转到数据页。",
+                        actionTitle: isRequestingAppleHealthAuthorization ? "正在授权…" : "立即授权 Apple 健康"
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(isRequestingAppleHealthAuthorization)
             }
         }
     }
@@ -1041,12 +1084,12 @@ struct HomeScreen: View {
             let latest: Double?
             let unit: String
 
-            if let annualMetric = annualMetricMap[item.1] {
-                latest = annualMetric.latestValue
-                unit = annualMetric.unit
-            } else if let chartValue = latestValue(in: chart(for: payload, alias: item.2), key: item.2) {
+            if let chartValue = latestValue(in: chart(for: payload, alias: item.2), key: item.2) {
                 latest = chartValue
                 unit = chart(for: payload, alias: item.2).lines.first(where: { $0.key == item.2 })?.unit ?? ""
+            } else if let annualMetric = annualMetricMap[item.1] {
+                latest = annualMetric.latestValue
+                unit = annualMetric.unit
             } else {
                 latest = nil
                 unit = ""
@@ -4146,7 +4189,13 @@ private struct DocumentInsightSheet: View {
     }
 
     private var cacheScope: String {
-        authManager.currentUser?.id ?? "anonymous"
+        settings.cacheScope(userID: authManager.currentUser?.id)
+    }
+
+    private var closeButton: some View {
+        Button("完成") { dismiss() }
+            .font(.body.weight(.semibold))
+            .frame(minWidth: 44, alignment: .trailing)
     }
 
     var body: some View {
@@ -4185,7 +4234,7 @@ private struct DocumentInsightSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    closeButton
                 }
             }
         }
@@ -4689,26 +4738,57 @@ private struct DocumentInsightSheet: View {
         return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
     }
 
-    private func loadInsights() async {
-        // Check client-side cache first
-        if let cached = DocumentInsightCache.shared.get(userId: cacheScope, type: insightType) {
-            result = cached
-            isLoading = false
-            return
+    private func finishLoading(
+        with response: DocumentInsightResponse,
+        startedAt: Date,
+        minimumDuration: TimeInterval,
+        storeInCache: Bool
+    ) async {
+        let elapsed = Date().timeIntervalSince(startedAt)
+        if elapsed < minimumDuration {
+            let remaining = minimumDuration - elapsed
+            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
         }
 
+        result = response
+        errorMessage = nil
+        isNoData = false
+        if storeInCache {
+            DocumentInsightCache.shared.set(userId: cacheScope, type: insightType, data: response)
+        }
+        isLoading = false
+    }
+
+    private func loadInsights() async {
+        let loadingStartedAt = Date()
         isLoading = true
         errorMessage = nil
         isNoData = false
+
+        // Check client-side cache first
+        if let cached = DocumentInsightCache.shared.get(userId: cacheScope, type: insightType) {
+            await finishLoading(
+                with: cached,
+                startedAt: loadingStartedAt,
+                minimumDuration: 1.2,
+                storeInCache: false
+            )
+            return
+        }
+
         do {
             let client = try settings.makeClient()
             let response = try await client.fetchDocumentInsights(type: insightType)
             if !response.hasData {
                 isNoData = true
+                isLoading = false
             } else {
-                result = response
-                // Save to client-side cache
-                DocumentInsightCache.shared.set(userId: cacheScope, type: insightType, data: response)
+                await finishLoading(
+                    with: response,
+                    startedAt: loadingStartedAt,
+                    minimumDuration: 2.4,
+                    storeInCache: true
+                )
             }
         } catch let apiError as HealthAPIClientError {
             switch apiError {
@@ -4717,10 +4797,11 @@ private struct DocumentInsightSheet: View {
             default:
                 errorMessage = apiError.localizedDescription
             }
+            isLoading = false
         } catch {
             errorMessage = error.localizedDescription
+            isLoading = false
         }
-        isLoading = false
     }
 }
 
@@ -4864,48 +4945,69 @@ private struct SummaryMetricTile: View {
     }
 }
 
-// MARK: - Client-side Insight Cache (30 min TTL)
+// MARK: - Client-side Insight Cache (persisted until local invalidation)
 
 private final class DocumentInsightCache {
     static let shared = DocumentInsightCache()
 
-    private struct CacheEntry {
-        let data: DocumentInsightResponse
-        let expiresAt: Date
-    }
+    private let fileStore = MobileFileStore(namespace: "HealthAI")
+    private var cache: [String: DocumentInsightResponse] = [:]
 
-    private var cache: [String: CacheEntry] = [:]
-    private let ttl: TimeInterval = 30 * 60 // 30 minutes
+    private func normalizedComponent(_ value: String) -> String {
+        value.replacingOccurrences(of: "[^A-Za-z0-9._-]", with: "_", options: .regularExpression)
+    }
 
     private func cacheKey(userId: String, type: String) -> String {
         "\(userId)::\(type)"
     }
 
+    private func fileName(userId: String, type: String) -> String {
+        "document-insight-\(normalizedComponent(userId))-\(normalizedComponent(type)).json"
+    }
+
     func get(userId: String, type: String) -> DocumentInsightResponse? {
         let key = cacheKey(userId: userId, type: type)
-        guard let entry = cache[key], entry.expiresAt > Date() else {
-            cache.removeValue(forKey: key)
+        if let cached = cache[key] {
+            return cached
+        }
+
+        guard let persisted = fileStore.load(
+            CachedPayload<DocumentInsightResponse>.self,
+            fileName: fileName(userId: userId, type: type)
+        ) else {
             return nil
         }
-        return entry.data
+
+        cache[key] = persisted.value
+        return persisted.value
     }
 
     func set(userId: String, type: String, data: DocumentInsightResponse) {
-        cache[cacheKey(userId: userId, type: type)] = CacheEntry(
-            data: data,
-            expiresAt: Date().addingTimeInterval(ttl)
+        let key = cacheKey(userId: userId, type: type)
+        cache[key] = data
+        _ = fileStore.save(
+            CachedPayload(value: data),
+            fileName: fileName(userId: userId, type: type)
         )
     }
 
     func invalidate(userId: String? = nil, type: String? = nil) {
         if let userId, let type {
             cache.removeValue(forKey: cacheKey(userId: userId, type: type))
+            _ = fileStore.remove(fileName: fileName(userId: userId, type: type))
         } else if let userId {
             let prefix = "\(userId)::"
             cache.keys.filter { $0.hasPrefix(prefix) }.forEach { cache.removeValue(forKey: $0) }
+            let normalizedUser = normalizedComponent(userId)
+            let candidates = [
+                fileName(userId: normalizedUser, type: "medical_exam"),
+                fileName(userId: normalizedUser, type: "genetic")
+            ]
+            candidates.forEach { _ = fileStore.remove(fileName: $0) }
         } else if let type {
             let suffix = "::\(type)"
             cache.keys.filter { $0.hasSuffix(suffix) }.forEach { cache.removeValue(forKey: $0) }
+            // Type-only invalidation is rare here; remove known persisted files on next access if needed.
         } else {
             cache.removeAll()
         }

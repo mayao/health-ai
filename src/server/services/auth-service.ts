@@ -372,7 +372,7 @@ function getIdentityOwner(
     const legacy = database.prepare(`
       SELECT id
       FROM users
-      WHERE lower(device_id) = ?
+      WHERE lower(trim(device_id)) = ?
     `).get(normalizedSubject) as { id: string } | undefined;
     if (legacy?.id) {
       return resolveCanonicalUserId(legacy.id, database);
@@ -401,17 +401,53 @@ function getPinnedUserId(
   database: DatabaseSync = getDatabase()
 ): string | null {
   const env = getAppEnv();
-  const configuredUserId = env.HEALTH_PINNED_USER_ID?.trim();
-  if (!configuredUserId) {
+  if (!env.HEALTH_SINGLE_USER_MODE) {
     return null;
   }
 
+  const configuredUserId = env.HEALTH_PINNED_USER_ID?.trim() || "user-self";
   const pinnedUser = getUserRow(configuredUserId, database);
   if (!pinnedUser) {
     return null;
   }
 
   return resolveCanonicalUserId(configuredUserId, database);
+}
+
+function getOwnerDeviceId(): string | null {
+  const env = getAppEnv();
+  if (!env.HEALTH_OWNER_DEVICE_ID) {
+    return null;
+  }
+  return normalizeIdentitySubject("device", env.HEALTH_OWNER_DEVICE_ID);
+}
+
+function normalizeDeviceLabel(label: string | undefined): string | null {
+  const normalized = label?.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  return normalized;
+}
+
+function getOwnerDeviceLabels(): Set<string> {
+  const env = getAppEnv();
+  const raw = env.HEALTH_OWNER_DEVICE_LABELS;
+  if (!raw) {
+    return new Set();
+  }
+
+  const labels = raw
+    .split(",")
+    .map((item) => normalizeDeviceLabel(item))
+    .filter((item): item is string => Boolean(item));
+  return new Set(labels);
+}
+
+export function getSingleUserModeUserId(
+  database: DatabaseSync = getDatabase()
+): string | null {
+  return getPinnedUserId(database);
 }
 
 function ensureUserRecord(
@@ -847,19 +883,29 @@ export function deviceLogin(
 
   const existingOwner = getIdentityOwner("device", normalizedDeviceId, database);
   const pinnedUserId = getPinnedUserId(database);
-  let targetUserId = pinnedUserId ?? existingOwner;
+  const ownerDeviceId = getOwnerDeviceId();
+  const ownerDeviceLabels = getOwnerDeviceLabels();
+  const normalizedDeviceLabel = normalizeDeviceLabel(deviceLabel);
+  const ownerUser = getUserRow("user-self", database);
+  const isOwnerDeviceById = Boolean(ownerUser && ownerDeviceId === normalizedDeviceId);
+  const isOwnerDeviceByLabel = Boolean(
+    ownerUser
+    && normalizedDeviceLabel
+    && ownerDeviceLabels.has(normalizedDeviceLabel)
+  );
+  const isOwnerDevice = isOwnerDeviceById || isOwnerDeviceByLabel;
+  let targetUserId = isOwnerDevice ? "user-self" : pinnedUserId ?? existingOwner;
   let isNewUser = false;
 
+  if (isOwnerDevice && existingOwner && existingOwner !== "user-self") {
+    targetUserId = mergeUsers(existingOwner, "user-self", database);
+  }
   if (pinnedUserId && existingOwner && existingOwner !== pinnedUserId) {
     targetUserId = mergeUsers(existingOwner, pinnedUserId, database);
   }
 
   if (!targetUserId) {
-    const env = getAppEnv();
-    const ownerDeviceId = env.HEALTH_OWNER_DEVICE_ID
-      ? normalizeIdentitySubject("device", env.HEALTH_OWNER_DEVICE_ID)
-      : null;
-    const bootstrapUser = ownerDeviceId === normalizedDeviceId ? getUserRow("user-self", database) : null;
+    const bootstrapUser = ownerDeviceId === normalizedDeviceId ? ownerUser : null;
     if (
       bootstrapUser &&
       !userHasDeviceIdentity("user-self", database)
@@ -869,16 +915,40 @@ export function deviceLogin(
   }
 
   if (!targetUserId) {
-    const { userId, isNewUser: created } = ensureUserRecord("device", normalizedDeviceId, {
-      deviceLabel
-    }, database);
-    targetUserId = userId;
-    isNewUser = created;
+    try {
+      const { userId, isNewUser: created } = ensureUserRecord("device", normalizedDeviceId, {
+        deviceLabel
+      }, database);
+      targetUserId = userId;
+      isNewUser = created;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isDuplicateDeviceConstraint =
+        message.includes("UNIQUE constraint failed: users.device_id")
+        || message.includes("constraint failed");
+      if (!isDuplicateDeviceConstraint) {
+        throw error;
+      }
+
+      const legacyOwner = database.prepare(`
+        SELECT id
+        FROM users
+        WHERE lower(trim(device_id)) = ?
+        LIMIT 1
+      `).get(normalizedDeviceId) as { id: string } | undefined;
+
+      if (!legacyOwner?.id) {
+        throw error;
+      }
+
+      targetUserId = resolveCanonicalUserId(legacyOwner.id, database);
+      isNewUser = false;
+    }
   }
 
   maybePromoteDisplayName(targetUserId, deviceLabel, database);
   ensureIdentityAttachedToUser("device", normalizedDeviceId, targetUserId, {
-    moveExistingToTarget: Boolean(pinnedUserId)
+    moveExistingToTarget: Boolean(pinnedUserId) || isOwnerDevice
   }, database);
 
   console.log(`[AUTH] Device login: ${targetUserId} (${deviceLabel ?? "unknown device"})`);
@@ -905,9 +975,26 @@ export async function signInWithApple(
     ? getIdentityOwner("device", normalizedDeviceId, database)
     : null;
   const pinnedUserId = getPinnedUserId(database);
-  let targetUserId = pinnedUserId ?? deviceOwner ?? existingOwner;
+  const ownerDeviceId = getOwnerDeviceId();
+  const ownerDeviceLabels = getOwnerDeviceLabels();
+  const normalizedDeviceLabel = normalizeDeviceLabel(deviceLabel);
+  const ownerUser = getUserRow("user-self", database);
+  const isOwnerDeviceById = Boolean(ownerUser && normalizedDeviceId && ownerDeviceId === normalizedDeviceId);
+  const isOwnerDeviceByLabel = Boolean(
+    ownerUser
+    && normalizedDeviceLabel
+    && ownerDeviceLabels.has(normalizedDeviceLabel)
+  );
+  const isOwnerDevice = isOwnerDeviceById || isOwnerDeviceByLabel;
+  let targetUserId = isOwnerDevice ? "user-self" : pinnedUserId ?? deviceOwner ?? existingOwner;
   let isNewUser = false;
 
+  if (isOwnerDevice && deviceOwner && deviceOwner !== "user-self") {
+    targetUserId = mergeUsers(deviceOwner, "user-self", database);
+  }
+  if (isOwnerDevice && existingOwner && existingOwner !== "user-self") {
+    targetUserId = mergeUsers(existingOwner, "user-self", database);
+  }
   if (pinnedUserId && deviceOwner && deviceOwner !== pinnedUserId) {
     targetUserId = mergeUsers(deviceOwner, pinnedUserId, database);
   }
@@ -927,11 +1014,11 @@ export async function signInWithApple(
   ensureIdentityAttachedToUser("apple", verifiedIdentity.subject, targetUserId, {
     email: verifiedIdentity.email ?? input.email ?? null,
     claimsJson: JSON.stringify(verifiedIdentity.rawClaims),
-    moveExistingToTarget: Boolean(deviceOwner) || Boolean(pinnedUserId)
+    moveExistingToTarget: Boolean(deviceOwner) || Boolean(pinnedUserId) || isOwnerDevice
   }, database);
   if (normalizedDeviceId) {
     ensureIdentityAttachedToUser("device", normalizedDeviceId, targetUserId, {
-      moveExistingToTarget: Boolean(pinnedUserId)
+      moveExistingToTarget: Boolean(pinnedUserId) || isOwnerDevice
     }, database);
   }
   maybePromoteDisplayName(targetUserId, input.displayName, database);
@@ -1041,7 +1128,44 @@ export function validateToken(
   `).get(tokenHash, new Date().toISOString()) as { id: string; user_id: string } | undefined;
 
   if (!session) {
-    throw new AuthError("会话已失效，请重新登录");
+    const fallbackUserId = getUserInfo(payload.sub, database)?.id;
+    if (!fallbackUserId) {
+      throw new AuthError("会话已失效，请重新登录");
+    }
+
+    const fallbackSessionId = payload.sid || randomUUID();
+    const fallbackExpiresAt = payload.exp
+      ? new Date(payload.exp * 1000).toISOString()
+      : new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const nowIso = new Date().toISOString();
+
+    database.prepare(`
+      INSERT INTO auth_sessions (
+        id,
+        user_id,
+        token_hash,
+        device_label,
+        created_at,
+        expires_at,
+        last_active_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        user_id = excluded.user_id,
+        token_hash = excluded.token_hash,
+        expires_at = excluded.expires_at,
+        last_active_at = excluded.last_active_at
+    `).run(
+      fallbackSessionId,
+      fallbackUserId,
+      tokenHash,
+      "cross-server-recovered",
+      nowIso,
+      fallbackExpiresAt,
+      nowIso
+    );
+
+    return fallbackUserId;
   }
 
   const canonicalUserId = resolveCanonicalUserId(session.user_id, database);

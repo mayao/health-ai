@@ -41,6 +41,11 @@ export interface DocumentInsightResult {
   generatedAt: string;
 }
 
+interface PersistedInsightRow {
+  result_json: string;
+  source_fingerprint: string;
+}
+
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 
 function buildMedicalExamPrompt(digest: AnnualExamDigest): string {
@@ -624,28 +629,168 @@ function buildRuleBasedGeneticResult(findings: GeneticFindingDigest[]): Document
 // ─── Main exported functions ──────────────────────────────────────────────────
 
 // ─── Insight Cache (persistent until new upload invalidates) ─────────────────
-const insightCache = new Map<string, { result: DocumentInsightResult }>();
+const insightCache = new Map<string, { sourceFingerprint: string; result: DocumentInsightResult }>();
 
-function getCachedInsight(key: string): DocumentInsightResult | null {
-  const entry = insightCache.get(key);
-  return entry?.result ?? null;
+function makeCacheKey(userId: string, type: "medical_exam" | "genetic"): string {
+  return `${type}:${userId}`;
 }
 
-function setCachedInsight(key: string, result: DocumentInsightResult): void {
-  insightCache.set(key, { result });
+function getCachedInsight(key: string, sourceFingerprint: string): DocumentInsightResult | null {
+  const entry = insightCache.get(key);
+  if (!entry || entry.sourceFingerprint !== sourceFingerprint) {
+    return null;
+  }
+  return entry.result;
+}
+
+function setCachedInsight(
+  key: string,
+  sourceFingerprint: string,
+  result: DocumentInsightResult
+): void {
+  insightCache.set(key, { sourceFingerprint, result });
+}
+
+function buildMedicalExamFingerprint(digest: AnnualExamDigest): string {
+  return JSON.stringify({
+    latestMeasurementSetId: digest.latestMeasurementSetId,
+    latestRecordedAt: digest.latestRecordedAt,
+    previousMeasurementSetId: digest.previousMeasurementSetId ?? "",
+    metrics: digest.metrics.map((metric) => ({
+      code: metric.metricCode,
+      latestValue: metric.latestValue,
+      previousValue: metric.previousValue ?? null,
+      abnormalFlag: metric.abnormalFlag,
+      referenceRange: metric.referenceRange ?? ""
+    }))
+  });
+}
+
+function buildGeneticFingerprint(findings: GeneticFindingDigest[]): string {
+  return JSON.stringify(
+    findings.map((finding) => ({
+      id: finding.id,
+      geneSymbol: finding.geneSymbol,
+      traitCode: finding.traitCode,
+      riskLevel: finding.riskLevel,
+      evidenceLevel: finding.evidenceLevel,
+      recordedAt: finding.recordedAt,
+      linkedMetricCode: finding.linkedMetric?.metricCode ?? "",
+      linkedMetricValue: finding.linkedMetric?.value ?? null,
+      linkedMetricFlag: finding.linkedMetric?.abnormalFlag ?? ""
+    }))
+  );
+}
+
+function loadPersistedInsight(
+  database: DatabaseSync,
+  userId: string,
+  type: "medical_exam" | "genetic",
+  sourceFingerprint: string
+): DocumentInsightResult | null {
+  const row = database
+    .prepare(
+      `
+      SELECT result_json, source_fingerprint
+      FROM document_insight_cache
+      WHERE id = ?
+    `
+    )
+    .get(makeCacheKey(userId, type)) as PersistedInsightRow | undefined;
+
+  if (!row || row.source_fingerprint !== sourceFingerprint) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(row.result_json) as DocumentInsightResult;
+  } catch {
+    database
+      .prepare("DELETE FROM document_insight_cache WHERE id = ?")
+      .run(makeCacheKey(userId, type));
+    return null;
+  }
+}
+
+function savePersistedInsight(
+  database: DatabaseSync,
+  userId: string,
+  type: "medical_exam" | "genetic",
+  sourceFingerprint: string,
+  result: DocumentInsightResult
+): void {
+  database
+    .prepare(
+      `
+      INSERT INTO document_insight_cache (
+        id,
+        user_id,
+        document_type,
+        source_fingerprint,
+        result_json,
+        summary_text,
+        generated_at,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        source_fingerprint = excluded.source_fingerprint,
+        result_json = excluded.result_json,
+        summary_text = excluded.summary_text,
+        generated_at = excluded.generated_at,
+        updated_at = CURRENT_TIMESTAMP
+    `
+    )
+    .run(
+      makeCacheKey(userId, type),
+      userId,
+      type,
+      sourceFingerprint,
+      JSON.stringify(result),
+      result.summary,
+      result.generatedAt
+    );
+}
+
+function deletePersistedInsight(
+  database: DatabaseSync,
+  userId: string,
+  type?: "medical_exam" | "genetic"
+): void {
+  if (type) {
+    database
+      .prepare("DELETE FROM document_insight_cache WHERE id = ?")
+      .run(makeCacheKey(userId, type));
+    return;
+  }
+
+  database
+    .prepare(
+      `
+      DELETE FROM document_insight_cache
+      WHERE id IN (?, ?)
+    `
+    )
+    .run(makeCacheKey(userId, "medical_exam"), makeCacheKey(userId, "genetic"));
 }
 
 /**
  * Invalidate insight cache for a user when new data is uploaded.
  * Call this from the import pipeline after a successful import.
  */
-export function invalidateInsightCache(userId: string, type?: "medical_exam" | "genetic"): void {
+export function invalidateInsightCache(
+  userId: string,
+  type?: "medical_exam" | "genetic",
+  database: DatabaseSync = getDatabase()
+): void {
   if (type) {
-    insightCache.delete(`${type}:${userId}`);
+    insightCache.delete(makeCacheKey(userId, type));
   } else {
-    insightCache.delete(`medical_exam:${userId}`);
-    insightCache.delete(`genetic:${userId}`);
+    insightCache.delete(makeCacheKey(userId, "medical_exam"));
+    insightCache.delete(makeCacheKey(userId, "genetic"));
   }
+  deletePersistedInsight(database, userId, type);
   console.log(`[Insight Cache] Invalidated cache for user=${userId} type=${type ?? "all"}`);
 }
 
@@ -653,10 +798,33 @@ export function invalidateInsightCache(userId: string, type?: "medical_exam" | "
  * Returns a short AI insight summary for a given type if it exists in cache.
  * Used by health-home-service to enrich source dimension cards without calling LLM.
  */
-export function getCachedInsightSummary(userId: string, type: "medical_exam" | "genetic"): string | null {
-  const key = `${type}:${userId}`;
-  const cached = getCachedInsight(key);
+export function getCachedInsightSummary(
+  userId: string,
+  type: "medical_exam" | "genetic",
+  database: DatabaseSync = getDatabase()
+): string | null {
+  const sourceFingerprint =
+    type === "medical_exam"
+      ? (() => {
+          const digest = getAnnualExamDigest(database, userId);
+          return digest ? buildMedicalExamFingerprint(digest) : null;
+        })()
+      : (() => {
+          const findings = listGeneticFindingDigests(database, userId);
+          return findings.length > 0 ? buildGeneticFingerprint(findings) : null;
+        })();
+
+  if (!sourceFingerprint) {
+    return null;
+  }
+
+  const key = makeCacheKey(userId, type);
+  const cached =
+    getCachedInsight(key, sourceFingerprint)
+    ?? loadPersistedInsight(database, userId, type, sourceFingerprint);
+
   if (!cached || !cached.hasData) return null;
+  setCachedInsight(key, sourceFingerprint, cached);
   // Build a compact summary from urgent/attention items
   const parts: string[] = [];
   if (cached.urgentItems.length > 0) {
@@ -696,9 +864,15 @@ export async function getMedicalExamInsights(
   }
 
   // Check cache
-  const cacheKey = `medical_exam:${userId}`;
-  const cached = getCachedInsight(cacheKey);
-  if (cached) return cached;
+  const cacheKey = makeCacheKey(userId, "medical_exam");
+  const sourceFingerprint = buildMedicalExamFingerprint(digest);
+  const cached =
+    getCachedInsight(cacheKey, sourceFingerprint)
+    ?? loadPersistedInsight(database, userId, "medical_exam", sourceFingerprint);
+  if (cached) {
+    setCachedInsight(cacheKey, sourceFingerprint, cached);
+    return cached;
+  }
 
   const prompt = buildMedicalExamPrompt(digest);
   try {
@@ -731,7 +905,8 @@ export async function getMedicalExamInsights(
       result.attentionItems,
       result.positiveItems
     );
-    setCachedInsight(cacheKey, result);
+    setCachedInsight(cacheKey, sourceFingerprint, result);
+    savePersistedInsight(database, userId, "medical_exam", sourceFingerprint, result);
     return result;
   } catch (error) {
     console.error(`[Insight] medical_exam analysis failed:`, error instanceof Error ? error.message : error);
@@ -764,9 +939,15 @@ export async function getGeneticInsights(
   }
 
   // Check cache
-  const cacheKey = `genetic:${userId}`;
-  const cached = getCachedInsight(cacheKey);
-  if (cached) return cached;
+  const cacheKey = makeCacheKey(userId, "genetic");
+  const sourceFingerprint = buildGeneticFingerprint(findings);
+  const cached =
+    getCachedInsight(cacheKey, sourceFingerprint)
+    ?? loadPersistedInsight(database, userId, "genetic", sourceFingerprint);
+  if (cached) {
+    setCachedInsight(cacheKey, sourceFingerprint, cached);
+    return cached;
+  }
 
   const prompt = buildGeneticPrompt(findings);
   try {
@@ -799,7 +980,8 @@ export async function getGeneticInsights(
       result.attentionItems,
       result.positiveItems
     );
-    setCachedInsight(cacheKey, result);
+    setCachedInsight(cacheKey, sourceFingerprint, result);
+    savePersistedInsight(database, userId, "genetic", sourceFingerprint, result);
     return result;
   } catch {
     return buildRuleBasedGeneticResult(findings);

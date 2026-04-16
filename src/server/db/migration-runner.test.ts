@@ -25,7 +25,8 @@ test("unified schema migrations create required tables and load 30+ metric recor
     "012_user_scoped_data_source_ids.sql",
     "013_diet_metric_category.sql",
     "014_genetic_findings_unified_source_fk.sql",
-    "015_user_identity_and_merge.sql"
+    "015_user_identity_and_merge.sql",
+    "016_document_insight_cache.sql"
   ]);
   assert.deepEqual(listAppliedMigrations(database), applied);
 

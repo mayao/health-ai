@@ -16,6 +16,7 @@ import {
   requestVerificationCode,
   resolveCanonicalUserId,
   signInWithApple,
+  validateToken,
   verifyCodeAndLogin
 } from "./auth-service";
 
@@ -230,8 +231,35 @@ test("user capabilities only expose account switching for user-self", () => {
   assert.equal(canUserSwitch(regularLogin.user.id, database), false);
 });
 
-test("pinned user id forces device and Apple sign-in to user-self", async () => {
+test("pinned user id is ignored unless single-user mode is explicitly enabled", async () => {
   const previousPinnedUserId = process.env.HEALTH_PINNED_USER_ID;
+  const previousSingleUserMode = process.env.HEALTH_SINGLE_USER_MODE;
+  process.env.HEALTH_PINNED_USER_ID = "user-self";
+  delete process.env.HEALTH_SINGLE_USER_MODE;
+  const database = setupDatabase();
+  const deviceId = "55555555-5555-4555-8555-555555555555";
+
+  try {
+    const deviceResult = deviceLogin(deviceId, "Matt iPhone", database);
+    assert.notEqual(deviceResult.user.id, "user-self");
+  } finally {
+    if (previousPinnedUserId === undefined) {
+      delete process.env.HEALTH_PINNED_USER_ID;
+    } else {
+      process.env.HEALTH_PINNED_USER_ID = previousPinnedUserId;
+    }
+
+    if (previousSingleUserMode === undefined) {
+      delete process.env.HEALTH_SINGLE_USER_MODE;
+    } else {
+      process.env.HEALTH_SINGLE_USER_MODE = previousSingleUserMode;
+    }
+  }
+});
+
+test("single-user mode forces device and Apple sign-in to user-self", async () => {
+  const previousPinnedUserId = process.env.HEALTH_PINNED_USER_ID;
+  const previousSingleUserMode = process.env.HEALTH_SINGLE_USER_MODE;
   delete process.env.HEALTH_PINNED_USER_ID;
   const database = setupDatabase();
   const deviceId = "55555555-5555-4555-8555-555555555555";
@@ -240,6 +268,7 @@ test("pinned user id forces device and Apple sign-in to user-self", async () => 
   assert.notEqual(firstDeviceLogin.user.id, "user-self");
 
   process.env.HEALTH_PINNED_USER_ID = "user-self";
+  process.env.HEALTH_SINGLE_USER_MODE = "true";
   try {
     const fixedDeviceLogin = deviceLogin(deviceId, "Matt iPhone", database);
     assert.equal(fixedDeviceLogin.user.id, "user-self");
@@ -272,5 +301,133 @@ test("pinned user id forces device and Apple sign-in to user-self", async () => 
     } else {
       process.env.HEALTH_PINNED_USER_ID = previousPinnedUserId;
     }
+
+    if (previousSingleUserMode === undefined) {
+      delete process.env.HEALTH_SINGLE_USER_MODE;
+    } else {
+      process.env.HEALTH_SINGLE_USER_MODE = previousSingleUserMode;
+    }
   }
+});
+
+test("owner device id forces login into user-self without enabling single-user mode", async () => {
+  const previousOwnerDeviceId = process.env.HEALTH_OWNER_DEVICE_ID;
+  const previousSingleUserMode = process.env.HEALTH_SINGLE_USER_MODE;
+  const previousPinnedUserId = process.env.HEALTH_PINNED_USER_ID;
+  delete process.env.HEALTH_SINGLE_USER_MODE;
+  delete process.env.HEALTH_PINNED_USER_ID;
+
+  const database = setupDatabase();
+  const ownerDeviceId = "88888888-8888-4888-8888-888888888888";
+  process.env.HEALTH_OWNER_DEVICE_ID = ownerDeviceId;
+
+  try {
+    const ownerDeviceLogin = deviceLogin(ownerDeviceId, "Owner iPhone", database);
+    assert.equal(ownerDeviceLogin.user.id, "user-self");
+
+    const ownerAppleLogin = await signInWithApple(
+      {
+        identityToken: "unused-token",
+        displayName: "Owner Apple",
+        email: "owner@example.com",
+        deviceId: ownerDeviceId
+      },
+      "Owner Apple",
+      database,
+      appleVerifier("owner-apple-sub")
+    );
+    assert.equal(ownerAppleLogin.user.id, "user-self");
+  } finally {
+    if (previousOwnerDeviceId === undefined) {
+      delete process.env.HEALTH_OWNER_DEVICE_ID;
+    } else {
+      process.env.HEALTH_OWNER_DEVICE_ID = previousOwnerDeviceId;
+    }
+    if (previousSingleUserMode === undefined) {
+      delete process.env.HEALTH_SINGLE_USER_MODE;
+    } else {
+      process.env.HEALTH_SINGLE_USER_MODE = previousSingleUserMode;
+    }
+    if (previousPinnedUserId === undefined) {
+      delete process.env.HEALTH_PINNED_USER_ID;
+    } else {
+      process.env.HEALTH_PINNED_USER_ID = previousPinnedUserId;
+    }
+  }
+});
+
+test("owner device label forces login into user-self without relying on device id", async () => {
+  const previousOwnerDeviceLabels = process.env.HEALTH_OWNER_DEVICE_LABELS;
+  const previousOwnerDeviceId = process.env.HEALTH_OWNER_DEVICE_ID;
+  const previousSingleUserMode = process.env.HEALTH_SINGLE_USER_MODE;
+  const previousPinnedUserId = process.env.HEALTH_PINNED_USER_ID;
+
+  delete process.env.HEALTH_OWNER_DEVICE_ID;
+  delete process.env.HEALTH_SINGLE_USER_MODE;
+  delete process.env.HEALTH_PINNED_USER_ID;
+  process.env.HEALTH_OWNER_DEVICE_LABELS = "Matt";
+
+  const database = setupDatabase();
+  const randomOwnerDeviceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+  try {
+    const ownerDeviceLogin = deviceLogin(randomOwnerDeviceId, "Matt", database);
+    assert.equal(ownerDeviceLogin.user.id, "user-self");
+
+    const ownerAppleLogin = await signInWithApple(
+      {
+        identityToken: "unused-token",
+        displayName: "Owner Apple",
+        email: "owner@example.com",
+        deviceId: randomOwnerDeviceId
+      },
+      "Matt",
+      database,
+      appleVerifier("owner-apple-sub-by-label")
+    );
+    assert.equal(ownerAppleLogin.user.id, "user-self");
+  } finally {
+    if (previousOwnerDeviceLabels === undefined) {
+      delete process.env.HEALTH_OWNER_DEVICE_LABELS;
+    } else {
+      process.env.HEALTH_OWNER_DEVICE_LABELS = previousOwnerDeviceLabels;
+    }
+    if (previousOwnerDeviceId === undefined) {
+      delete process.env.HEALTH_OWNER_DEVICE_ID;
+    } else {
+      process.env.HEALTH_OWNER_DEVICE_ID = previousOwnerDeviceId;
+    }
+    if (previousSingleUserMode === undefined) {
+      delete process.env.HEALTH_SINGLE_USER_MODE;
+    } else {
+      process.env.HEALTH_SINGLE_USER_MODE = previousSingleUserMode;
+    }
+    if (previousPinnedUserId === undefined) {
+      delete process.env.HEALTH_PINNED_USER_ID;
+    } else {
+      process.env.HEALTH_PINNED_USER_ID = previousPinnedUserId;
+    }
+  }
+});
+
+test("validateToken can recover session on another server when JWT is still valid", () => {
+  const databaseA = setupDatabase();
+  const deviceId = "99999999-9999-4999-8999-999999999999";
+  const loginA = deviceLogin(deviceId, "Matt iPhone", databaseA);
+  const tokenFromA = loginA.token;
+  const userId = loginA.user.id;
+
+  const databaseB = setupDatabase();
+  const loginB = deviceLogin(deviceId, "Matt iPhone", databaseB);
+  assert.equal(loginB.user.id, userId);
+
+  const validatedUserId = validateToken(tokenFromA, databaseB);
+  assert.equal(validatedUserId, userId);
+
+  const sessionCount = databaseB.prepare(`
+    SELECT COUNT(*) AS count
+    FROM auth_sessions
+    WHERE user_id = ?
+  `).get(userId) as { count: number };
+  assert.ok(sessionCount.count >= 2);
 });

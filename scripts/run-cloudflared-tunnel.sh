@@ -80,6 +80,9 @@ fi
 if [ -n "${TUNNEL_METRICS:-}" ]; then
   ARGS+=(--metrics "$TUNNEL_METRICS")
 fi
+if [ -n "${TUNNEL_TRANSPORT_PROTOCOL:-}" ]; then
+  ARGS+=(--protocol "$TUNNEL_TRANSPORT_PROTOCOL")
+fi
 ARGS+=(run --token "$TUNNEL_TOKEN")
 
 exec "$CLOUDFLARED_BIN" "${ARGS[@]}"

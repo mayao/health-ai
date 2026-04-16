@@ -372,6 +372,7 @@ function summarizeGeneticFindings(geneticFindings: GeneticFindingView[]) {
 }
 
 function buildSourceDimensions(
+  database: DatabaseSync,
   annualExam: AnnualExamView | undefined,
   geneticFindings: GeneticFindingView[],
   appleHealthSync: {
@@ -390,8 +391,8 @@ function buildSourceDimensions(
   userId?: string
 ): HealthSourceDimensionCard[] {
   // Try to enrich with AI insight cache data
-  const examInsightSummary = userId ? getCachedInsightSummary(userId, "medical_exam") : null;
-  const geneticInsightSummary = userId ? getCachedInsightSummary(userId, "genetic") : null;
+  const examInsightSummary = userId ? getCachedInsightSummary(userId, "medical_exam", database) : null;
+  const geneticInsightSummary = userId ? getCachedInsightSummary(userId, "genetic", database) : null;
   const ldl = metricSummaries.find((item) => item.metric_code === "lipid.ldl_c");
   const bodyFat = metricSummaries.find((item) => item.metric_code === "body.body_fat_pct");
   const exercise = metricSummaries.find((item) => item.metric_code === "activity.exercise_minutes");
@@ -1267,7 +1268,7 @@ interface HealthHomeServiceOptions {
  */
 export async function getHealthHomePageData(
   database: DatabaseSync = getDatabase(),
-  userId: string = "user-self",
+  userId: string,
   options: HealthHomeServiceOptions = {}
 ): Promise<HealthHomePageData> {
   const latestAsOf = resolveAnalysisAsOf(getLatestSampleTime(database, userId), options.now);
@@ -1412,6 +1413,7 @@ export async function getHealthHomePageData(
     }
   };
   const sourceDimensions = buildSourceDimensions(
+    database,
     annualExam,
     geneticFindings,
     appleHealthSync,

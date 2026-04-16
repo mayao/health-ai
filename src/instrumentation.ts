@@ -1,6 +1,9 @@
 export async function register() {
   // Only run on the server (not edge runtime)
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    const syncEnabled =
+      process.env.HEALTH_SYNC_ENABLED === "1"
+      || process.env.HEALTH_SYNC_ENABLED === "true";
     const { startUDPBroadcast } = await import(
       "./server/services/udp-broadcast"
     );
@@ -17,35 +20,39 @@ export async function register() {
     // Ensure DB is initialized (runs migrations including 010_sync_system)
     getDatabase();
 
-    startUDPBroadcast({
-      httpPort: port,
-      getServerId: () => getServerId(),
-      onPeerDiscovered: (serverId, name, ip, peerPort) => {
-        try {
-          const db = getDatabase();
-          const url = `http://${ip}:${peerPort}/`;
-          const now = new Date().toISOString();
+    if (syncEnabled) {
+      startUDPBroadcast({
+        httpPort: port,
+        getServerId: () => getServerId(),
+        onPeerDiscovered: (serverId, name, ip, peerPort) => {
+          try {
+            const db = getDatabase();
+            const url = `http://${ip}:${peerPort}/`;
+            const now = new Date().toISOString();
 
-          const existing = db
-            .prepare("SELECT server_id FROM sync_peer WHERE server_id = ?")
-            .get(serverId);
+            const existing = db
+              .prepare("SELECT server_id FROM sync_peer WHERE server_id = ?")
+              .get(serverId);
 
-          if (existing) {
-            db.prepare(
-              "UPDATE sync_peer SET name = ?, url = ?, last_seen_at = ? WHERE server_id = ?"
-            ).run(name, url, now, serverId);
-          } else {
-            db.prepare(
-              "INSERT INTO sync_peer (server_id, name, url, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?)"
-            ).run(serverId, name, url, now, now);
-            console.log(`[UDP Discovery] New peer discovered: ${name} (${url})`);
+            if (existing) {
+              db.prepare(
+                "UPDATE sync_peer SET name = ?, url = ?, last_seen_at = ? WHERE server_id = ?"
+              ).run(name, url, now, serverId);
+            } else {
+              db.prepare(
+                "INSERT INTO sync_peer (server_id, name, url, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?)"
+              ).run(serverId, name, url, now, now);
+              console.log(`[UDP Discovery] New peer discovered: ${name} (${url})`);
+            }
+          } catch {
+            // DB not ready — ignore
           }
-        } catch {
-          // DB not ready — ignore
         }
-      },
-    });
+      });
 
-    startSyncScheduler();
+      startSyncScheduler();
+    } else {
+      console.log("[Sync Scheduler] Disabled by HEALTH_SYNC_ENABLED");
+    }
   }
 }

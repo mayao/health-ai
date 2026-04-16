@@ -58,9 +58,9 @@ struct VitalCommandIOSApp: App {
                 if authManager.isAuthenticated {
                     autoSync.syncIfNeeded(settings: settings)
                 }
-                // Ensure splash shows for at least 2.5 seconds
+                // Keep launch animation smooth without blocking login too long.
                 let elapsed = Date().timeIntervalSince(splashStart)
-                let remaining = 2.5 - elapsed
+                let remaining = 1.0 - elapsed
                 if remaining > 0 {
                     try? await Task.sleep(for: .seconds(remaining))
                 }

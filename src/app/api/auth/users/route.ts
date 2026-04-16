@@ -9,8 +9,8 @@ export async function GET(request: Request) {
   try {
     const currentUserId = getAuthenticatedUserId(request);
     const db = getDatabase();
-    const users = listAllUsers(db);
     const canSwitchUser = canUserSwitch(currentUserId, db);
+    const users = canSwitchUser ? listAllUsers(db) : [];
     return jsonOk({ users, currentUserId, canSwitchUser });
   } catch (error) {
     if (error instanceof AuthError) {

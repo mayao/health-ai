@@ -258,7 +258,7 @@ function parseOverviewJSON(text: string): {
  * Uses caching (30 min TTL) and retry with fallback chain: Kimi → Anthropic → rule-based.
  */
 export async function generateAIOverview(
-  userId: string = "user-self",
+  userId: string,
   database: DatabaseSync = getDatabase()
 ): Promise<AIOverviewResult> {
   // Check cache first
