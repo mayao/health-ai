@@ -1,8 +1,21 @@
 import type { AppEnv } from "../config/env";
 
-export type LLMProviderName = "anthropic" | "openai_compatible" | "kimi" | "gemini";
+export type LLMProviderName =
+  | "anthropic"
+  | "openai_compatible"
+  | "kimi"
+  | "glm"
+  | "minimax"
+  | "gemini";
 
-export const BASE_PROVIDER_ORDER: LLMProviderName[] = ["kimi", "openai_compatible", "gemini"];
+export const BASE_PROVIDER_ORDER: LLMProviderName[] = [
+  "anthropic",
+  "kimi",
+  "glm",
+  "minimax",
+  "openai_compatible",
+  "gemini"
+];
 
 export function isKimiCodingKey(apiKey?: string | null): boolean {
   return !!apiKey?.startsWith("sk-kimi-");
@@ -16,7 +29,21 @@ export function getKimiOpenAIHeaders(apiKey?: string | null): Record<string, str
 export function isProviderConfigured(provider: LLMProviderName, env: AppEnv): boolean {
   switch (provider) {
     case "kimi":
-      return !!process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
+      return !!(
+        process.env.HEALTH_LLM_FALLBACK_KIMI_KEY &&
+        (
+          process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL ||
+          process.env.HEALTH_LLM_FALLBACK_KIMI_KEY.startsWith("sk-kimi-") ||
+          process.env.HEALTH_LLM_FALLBACK_KIMI_KEY.startsWith("sk-")
+        )
+      );
+    case "glm":
+      return !!(process.env.HEALTH_LLM_FALLBACK_GLM_KEY && process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL);
+    case "minimax":
+      return !!(
+        process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY &&
+        process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL
+      );
     case "anthropic":
       return !!(env.HEALTH_LLM_API_KEY && (!env.HEALTH_LLM_PROVIDER || env.HEALTH_LLM_PROVIDER === "anthropic"));
     case "openai_compatible":
@@ -88,10 +115,20 @@ function probeTargetFor(provider: LLMProviderName, env: AppEnv): string | null {
     case "kimi": {
       const kimiKey = process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
       if (!kimiKey) return null;
+      if (process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL) {
+        return process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL;
+      }
       return kimiKey.startsWith("sk-kimi-") ? "https://api.kimi.com" : "https://api.moonshot.cn";
     }
+    case "glm":
+      return process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL ?? null;
+    case "minimax":
+      return process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL ?? null;
     case "anthropic":
-      return isProviderConfigured("anthropic", env) ? "https://api.anthropic.com/v1/messages" : null;
+      if (!isProviderConfigured("anthropic", env)) {
+        return null;
+      }
+      return env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages";
     case "openai_compatible":
       return env.HEALTH_LLM_BASE_URL ?? null;
     case "gemini":

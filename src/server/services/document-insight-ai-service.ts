@@ -260,13 +260,17 @@ function parseLLMResponse(text: string): LLMInsightPayload | null {
 async function callAnthropicForInsights(
   prompt: string,
   apiKey: string,
-  model: string
+  model: string,
+  baseUrl: string = "https://api.anthropic.com/v1/messages"
 ): Promise<{ text: string; model: string }> {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const resolvedBase = baseUrl.replace(/\/$/, "");
+  const messageURL = resolvedBase.endsWith("/messages") ? resolvedBase : `${resolvedBase}/messages`;
+  const response = await fetch(messageURL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
+      Authorization: `Bearer ${apiKey}`,
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
@@ -383,20 +387,20 @@ export async function callLLMWithFallbacks(
   const tryAnthropic: LLMProviderFn = async () => {
     if (!(env.HEALTH_LLM_API_KEY && env.HEALTH_LLM_PROVIDER === "anthropic")) throw new Error("not configured");
     const model = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST", signal: makeSignal(),
-      headers: { "Content-Type": "application/json", "x-api-key": env.HEALTH_LLM_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model, max_tokens: 8192, messages: [{ role: "user", content: prompt }] })
-    });
-    if (!response.ok) throw new Error(`Anthropic API ${response.status}`);
-    const data = (await response.json()) as { content?: Array<{ type: string; text?: string }>; model?: string };
-    return { text: data.content?.find((c) => c.type === "text")?.text ?? "", model: data.model ?? model, provider: "anthropic" };
+    const baseUrl = env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages";
+    const data = await callAnthropicForInsights(prompt, env.HEALTH_LLM_API_KEY, model, baseUrl);
+    return { text: data.text, model: data.model, provider: "anthropic" };
   };
 
   const tryKimi: LLMProviderFn = async () => {
     const kimiKey = process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
     if (!kimiKey) throw new Error("not configured");
     const model = process.env.HEALTH_LLM_FALLBACK_KIMI_MODEL ?? "kimi-latest";
+    const kimiBaseUrl = process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL;
+    if (kimiBaseUrl) {
+      const data = await callAnthropicForInsights(prompt, kimiKey, model, kimiBaseUrl);
+      return { text: data.text, model: data.model, provider: "kimi" };
+    }
     // sk-kimi-* keys use api.kimi.com; sk-* keys use api.moonshot.cn
     const baseUrl = kimiKey.startsWith("sk-kimi-") ? "https://api.kimi.com/coding/v1" : "https://api.moonshot.cn/v1";
     const headers: Record<string, string> = { "Content-Type": "application/json", Authorization: `Bearer ${kimiKey}` };
@@ -409,6 +413,24 @@ export async function callLLMWithFallbacks(
     if (!response.ok) throw new Error(`Kimi API ${response.status}`);
     const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }>; model?: string };
     return { text: data.choices?.[0]?.message?.content ?? "", model: data.model ?? model, provider: "kimi" };
+  };
+
+  const tryGLM: LLMProviderFn = async () => {
+    const key = process.env.HEALTH_LLM_FALLBACK_GLM_KEY;
+    const baseUrl = process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL;
+    if (!(key && baseUrl)) throw new Error("not configured");
+    const model = process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5";
+    const data = await callAnthropicForInsights(prompt, key, model, baseUrl);
+    return { text: data.text, model: data.model, provider: "glm" };
+  };
+
+  const tryMinimax: LLMProviderFn = async () => {
+    const key = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
+    const baseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
+    if (!(key && baseUrl)) throw new Error("not configured");
+    const model = process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped";
+    const data = await callAnthropicForInsights(prompt, key, model, baseUrl);
+    return { text: data.text, model: data.model, provider: "minimax" };
   };
 
   const tryGemini: LLMProviderFn = async () => {
@@ -432,6 +454,8 @@ export async function callLLMWithFallbacks(
     anthropic: tryAnthropic,
     openai_compatible: tryOpenAI,
     kimi: tryKimi,
+    glm: tryGLM,
+    minimax: tryMinimax,
     gemini: tryGemini,
   };
 

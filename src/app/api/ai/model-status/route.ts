@@ -17,6 +17,8 @@ type VisibleProviderName = Exclude<LLMProviderName, "anthropic">;
 async function buildProviders(preferredProvider: string | null) {
   const env = getAppEnv();
   const kimiKey = process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
+  const glmKey = process.env.HEALTH_LLM_FALLBACK_GLM_KEY;
+  const minimaxKey = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
   const geminiKey = process.env.HEALTH_LLM_FALLBACK_GEMINI_KEY;
   const openaiOk = !!(env.HEALTH_LLM_API_KEY && env.HEALTH_LLM_PROVIDER === "openai-compatible" && env.HEALTH_LLM_BASE_URL);
 
@@ -44,6 +46,20 @@ async function buildProviders(preferredProvider: string | null) {
       isConfigured: !!kimiKey,
       isPrimary: activeProvider === "kimi",
       model: kimiKey ? (process.env.HEALTH_LLM_FALLBACK_KIMI_MODEL ?? "kimi-for-coding") : null
+    },
+    glm: {
+      name: "glm",
+      label: "GLM",
+      isConfigured: !!glmKey,
+      isPrimary: activeProvider === "glm",
+      model: glmKey ? (process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5") : null
+    },
+    minimax: {
+      name: "minimax",
+      label: "MiniMax",
+      isConfigured: !!minimaxKey,
+      isPrimary: activeProvider === "minimax",
+      model: minimaxKey ? (process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped") : null
     },
     gemini: {
       name: "gemini",
@@ -89,7 +105,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { provider?: string };
     const provider = body.provider ?? null;
 
-    const validProviders = ["openai_compatible", "kimi", "gemini"];
+    const validProviders = ["openai_compatible", "kimi", "glm", "minimax", "gemini"];
     if (provider && !validProviders.includes(provider)) {
       return jsonSafeError({ message: "无效的模型提供商", status: 400, error: new Error("invalid provider"), context: { route: "/api/ai/model-status" } });
     }

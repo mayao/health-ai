@@ -50,6 +50,7 @@ export class MockHealthSummaryProvider implements HealthSummaryProvider {
 interface AnthropicProviderOptions {
   apiKey: string;
   model: string;
+  baseUrl?: string;
 }
 
 export class AnthropicHealthSummaryProvider implements HealthSummaryProvider {
@@ -59,7 +60,14 @@ export class AnthropicHealthSummaryProvider implements HealthSummaryProvider {
 
   constructor(options: AnthropicProviderOptions) {
     this.model = options.model;
-    this.client = new Anthropic({ apiKey: options.apiKey });
+    this.client = new Anthropic({
+      apiKey: options.apiKey,
+      baseURL: options.baseUrl
+        ? (options.baseUrl.endsWith("/messages")
+            ? options.baseUrl.replace(/\/messages$/, "")
+            : options.baseUrl.replace(/\/$/, ""))
+        : undefined
+    });
   }
 
   async generate(

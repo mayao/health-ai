@@ -128,18 +128,22 @@ async function requestAnthropicReply(
   request: HealthAIChatRequest,
   payload: Awaited<ReturnType<typeof getHealthHomePageData>>,
   apiKey: string,
-  model: string
+  model: string,
+  baseUrl: string = "https://api.anthropic.com/v1/messages"
 ) {
   const systemPrompt = buildSystemPrompt(payload);
+  const base = baseUrl.replace(/\/$/, "");
+  const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45_000);
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(messageURL, {
     method: "POST",
     signal: ctrl.signal,
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
+      Authorization: `Bearer ${apiKey}`,
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
@@ -253,21 +257,42 @@ async function requestProviderReply(
         const apiKey = isAnthropicProvider ? env.HEALTH_LLM_API_KEY : undefined;
         if (!apiKey) continue;
         const model = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
-        return await requestAnthropicReply(request, payload, apiKey, model);
+        const baseUrl = env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages";
+        return await requestAnthropicReply(request, payload, apiKey, model, baseUrl);
       }
 
       if (provider === "kimi") {
         const apiKey = process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
         const model = process.env.HEALTH_LLM_FALLBACK_KIMI_MODEL ?? "kimi-latest";
         if (!apiKey) continue;
+        const kimiBaseUrl = process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL;
+        if (kimiBaseUrl) {
+          return await requestAnthropicReply(request, payload, apiKey, model, kimiBaseUrl);
+        }
         // sk-kimi-* keys use api.kimi.com; sk-* keys use api.moonshot.cn
         const isKimiKey = apiKey.startsWith("sk-kimi-");
-        const kimiBaseUrl = isKimiKey ? "https://api.kimi.com/coding/v1" : "https://api.moonshot.cn/v1";
+        const kimiOpenAIBaseUrl = isKimiKey ? "https://api.kimi.com/coding/v1" : "https://api.moonshot.cn/v1";
         const kimiHeaders = isKimiKey ? { "User-Agent": "KimiCLI/1.3" } : undefined;
         return await requestOpenAICompatibleReply(
           request, payload, apiKey,
-          kimiBaseUrl, model, kimiHeaders
+          kimiOpenAIBaseUrl, model, kimiHeaders
         );
+      }
+
+      if (provider === "glm") {
+        const apiKey = process.env.HEALTH_LLM_FALLBACK_GLM_KEY;
+        const baseUrl = process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL;
+        const model = process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5";
+        if (!(apiKey && baseUrl)) continue;
+        return await requestAnthropicReply(request, payload, apiKey, model, baseUrl);
+      }
+
+      if (provider === "minimax") {
+        const apiKey = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
+        const baseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
+        const model = process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped";
+        if (!(apiKey && baseUrl)) continue;
+        return await requestAnthropicReply(request, payload, apiKey, model, baseUrl);
       }
 
       if (provider === "openai_compatible") {
@@ -419,6 +444,15 @@ export async function streamHealthAIReply(
       const kimiKey = process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
       const kimiModel = process.env.HEALTH_LLM_FALLBACK_KIMI_MODEL ?? "kimi-latest";
       if (!kimiKey) continue;
+      const kimiAnthropicBaseUrl = process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL;
+      if (kimiAnthropicBaseUrl) {
+        raceCandidates.push(
+          openAnthropicStreamingRequest(kimiKey, kimiModel, systemPrompt, request.messages, kimiAnthropicBaseUrl)
+            .then(stream => ({ stream, provider: "kimi", model: kimiModel }))
+            .catch(e => { console.warn("[AI Chat Stream] kimi(anthropic-gateway) failed:", e instanceof Error ? e.message : e); throw e; })
+        );
+        continue;
+      }
       const isKimiKey = kimiKey.startsWith("sk-kimi-");
       const kimiBaseUrl = isKimiKey ? "https://api.kimi.com/coding/v1" : "https://api.moonshot.cn/v1";
       const kimiHeaders: Record<string, string> = {};
@@ -431,12 +465,39 @@ export async function streamHealthAIReply(
       continue;
     }
 
+    if (provider === "glm") {
+      const glmKey = process.env.HEALTH_LLM_FALLBACK_GLM_KEY;
+      const glmModel = process.env.HEALTH_LLM_FALLBACK_GLM_MODEL ?? "glm-5";
+      const glmBaseUrl = process.env.HEALTH_LLM_FALLBACK_GLM_BASE_URL;
+      if (!(glmKey && glmBaseUrl)) continue;
+      raceCandidates.push(
+        openAnthropicStreamingRequest(glmKey, glmModel, systemPrompt, request.messages, glmBaseUrl)
+          .then(stream => ({ stream, provider: "glm", model: glmModel }))
+          .catch(e => { console.warn("[AI Chat Stream] glm failed:", e instanceof Error ? e.message : e); throw e; })
+      );
+      continue;
+    }
+
+    if (provider === "minimax") {
+      const minimaxKey = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
+      const minimaxModel = process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped";
+      const minimaxBaseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
+      if (!(minimaxKey && minimaxBaseUrl)) continue;
+      raceCandidates.push(
+        openAnthropicStreamingRequest(minimaxKey, minimaxModel, systemPrompt, request.messages, minimaxBaseUrl)
+          .then(stream => ({ stream, provider: "minimax", model: minimaxModel }))
+          .catch(e => { console.warn("[AI Chat Stream] minimax failed:", e instanceof Error ? e.message : e); throw e; })
+      );
+      continue;
+    }
+
     if (provider === "anthropic") {
       const anthropicKey = env.HEALTH_LLM_PROVIDER === "anthropic" ? env.HEALTH_LLM_API_KEY : undefined;
       if (!anthropicKey) continue;
       const anthropicModel = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
+      const anthropicBaseUrl = env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages";
       raceCandidates.push(
-        openAnthropicStreamingRequest(anthropicKey, anthropicModel, systemPrompt, request.messages)
+        openAnthropicStreamingRequest(anthropicKey, anthropicModel, systemPrompt, request.messages, anthropicBaseUrl)
           .then(stream => ({ stream, provider: "anthropic", model: anthropicModel }))
           .catch(e => { console.warn("[AI Chat Stream] anthropic failed:", e instanceof Error ? e.message : e); throw e; })
       );
@@ -598,16 +659,20 @@ async function openAnthropicStreamingRequest(
   apiKey: string,
   model: string,
   systemPrompt: string,
-  messages: HealthAIChatRequest["messages"]
+  messages: HealthAIChatRequest["messages"],
+  baseUrl: string = "https://api.anthropic.com/v1/messages"
 ): Promise<ReadableStream<Uint8Array>> {
+  const base = baseUrl.replace(/\/$/, "");
+  const messageURL = base.endsWith("/messages") ? base : `${base}/messages`;
   const ctrl = new AbortController();
   const connectTimeout = setTimeout(() => ctrl.abort(), 30_000);
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(messageURL, {
     method: "POST",
     signal: ctrl.signal,
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
+      Authorization: `Bearer ${apiKey}`,
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({

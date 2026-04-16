@@ -236,7 +236,8 @@ export function resolveHealthSummaryProvider(): HealthSummaryProvider {
   if (providerPriority.includes("anthropic") && env.HEALTH_LLM_API_KEY) {
     return new AnthropicHealthSummaryProvider({
       apiKey: env.HEALTH_LLM_API_KEY,
-      model: env.HEALTH_LLM_MODEL ?? "claude-opus-4-6"
+      model: env.HEALTH_LLM_MODEL ?? "claude-opus-4-6",
+      baseUrl: env.HEALTH_LLM_BASE_URL
     });
   }
 
