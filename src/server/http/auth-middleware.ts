@@ -1,35 +1,26 @@
 import { getAppEnv } from "../config/env";
-import { validateToken, AuthError, getSingleUserModeUserId } from "../services/auth-service";
+import { validateToken, AuthError } from "../services/auth-service";
 
 export { AuthError };
 
-function getAuthenticatedUserIdFromRequestHeaders(headers: Headers): string {
+/**
+ * Extract authenticated user ID from request.
+ * When HEALTH_AUTH_ENABLED is false, returns "user-self" for backward compatibility.
+ */
+export function getAuthenticatedUserId(request: Request): string {
   const env = getAppEnv();
 
   if (!env.HEALTH_AUTH_ENABLED) {
-    const singleUserId = getSingleUserModeUserId();
-    if (!singleUserId) {
-      throw new AuthError("服务端未启用登录，且未显式开启单人模式，已拒绝请求以防止数据串号。");
-    }
-
-    return singleUserId;
+    return "user-self";
   }
 
-  const authHeader = headers.get("Authorization");
+  const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     throw new AuthError("请先登录");
   }
 
   const token = authHeader.slice(7);
   return validateToken(token);
-}
-
-/**
- * Extract authenticated user ID from request.
- * In multi-user mode, missing auth is rejected instead of falling back to a shared account.
- */
-export function getAuthenticatedUserId(request: Request): string {
-  return getAuthenticatedUserIdFromRequestHeaders(request.headers);
 }
 
 /**
@@ -42,5 +33,17 @@ export function extractBearerToken(request: Request): string | null {
 }
 
 export function getAuthenticatedUserIdFromHeaders(headers: Headers): string {
-  return getAuthenticatedUserIdFromRequestHeaders(headers);
+  const env = getAppEnv();
+
+  if (!env.HEALTH_AUTH_ENABLED) {
+    return "user-self";
+  }
+
+  const authHeader = headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw new AuthError("请先登录");
+  }
+
+  const token = authHeader.slice(7);
+  return validateToken(token);
 }

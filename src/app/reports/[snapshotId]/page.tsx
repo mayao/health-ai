@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 
 import { ReportDetail } from "../../../components/report-detail";
 import { SiteHeader } from "../../../components/site-header";
-import { AuthError, getAuthenticatedUserIdFromHeaders } from "../../../server/http/auth-middleware";
+import {
+  AuthError,
+  getAuthenticatedUserIdFromHeaders,
+} from "../../../server/http/auth-middleware";
 import { getReportSnapshotDetail } from "../../../server/services/report-service";
 
 export const dynamic = "force-dynamic";

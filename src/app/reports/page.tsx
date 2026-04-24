@@ -2,7 +2,10 @@ import { headers } from "next/headers";
 
 import { ReportCard } from "../../components/report-card";
 import { SiteHeader } from "../../components/site-header";
-import { AuthError, getAuthenticatedUserIdFromHeaders } from "../../server/http/auth-middleware";
+import {
+  AuthError,
+  getAuthenticatedUserIdFromHeaders,
+} from "../../server/http/auth-middleware";
 import { getReportsIndexData } from "../../server/services/report-service";
 
 export const dynamic = "force-dynamic";
