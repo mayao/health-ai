@@ -1,9 +1,11 @@
 export async function register() {
   // Only run on the server (not edge runtime)
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const syncEnabled =
-      process.env.HEALTH_SYNC_ENABLED === "1"
-      || process.env.HEALTH_SYNC_ENABLED === "true";
+    if (process.env.HEALTH_SYNC_ENABLED === "0") {
+      console.log("[Sync] Disabled by HEALTH_SYNC_ENABLED=0");
+      return;
+    }
+
     const { startUDPBroadcast } = await import(
       "./server/services/udp-broadcast"
     );
@@ -15,44 +17,57 @@ export async function register() {
       "./server/services/sync/sync-scheduler"
     );
 
-    const port = Number(process.env.PORT ?? 3000);
+    const port = Number(
+      process.env.HEALTH_SERVER_PORT ?? process.env.PORT ?? 3000
+    );
 
     // Ensure DB is initialized (runs migrations including 010_sync_system)
     getDatabase();
 
-    if (syncEnabled) {
-      startUDPBroadcast({
-        httpPort: port,
-        getServerId: () => getServerId(),
-        onPeerDiscovered: (serverId, name, ip, peerPort) => {
-          try {
-            const db = getDatabase();
-            const url = `http://${ip}:${peerPort}/`;
-            const now = new Date().toISOString();
+    const isUnroutableHost = (host: string | null | undefined): boolean => {
+      if (!host) return true;
+      const normalized = host.trim().toLowerCase();
+      return (
+        normalized === "0.0.0.0" ||
+        normalized === "::" ||
+        normalized === "::1" ||
+        normalized === "127.0.0.1" ||
+        normalized === "localhost"
+      );
+    };
 
-            const existing = db
-              .prepare("SELECT server_id FROM sync_peer WHERE server_id = ?")
-              .get(serverId);
-
-            if (existing) {
-              db.prepare(
-                "UPDATE sync_peer SET name = ?, url = ?, last_seen_at = ? WHERE server_id = ?"
-              ).run(name, url, now, serverId);
-            } else {
-              db.prepare(
-                "INSERT INTO sync_peer (server_id, name, url, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?)"
-              ).run(serverId, name, url, now, now);
-              console.log(`[UDP Discovery] New peer discovered: ${name} (${url})`);
-            }
-          } catch {
-            // DB not ready — ignore
+    startUDPBroadcast({
+      httpPort: port,
+      getServerId: () => getServerId(),
+      onPeerDiscovered: (serverId, name, ip, peerPort) => {
+        try {
+          if (isUnroutableHost(ip)) {
+            return;
           }
-        }
-      });
+          const db = getDatabase();
+          const url = `http://${ip}:${peerPort}/`;
+          const now = new Date().toISOString();
 
-      startSyncScheduler();
-    } else {
-      console.log("[Sync Scheduler] Disabled by HEALTH_SYNC_ENABLED");
-    }
+          const existing = db
+            .prepare("SELECT server_id FROM sync_peer WHERE server_id = ?")
+            .get(serverId);
+
+          if (existing) {
+            db.prepare(
+              "UPDATE sync_peer SET name = ?, url = ?, last_seen_at = ? WHERE server_id = ?"
+            ).run(name, url, now, serverId);
+          } else {
+            db.prepare(
+              "INSERT INTO sync_peer (server_id, name, url, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?)"
+            ).run(serverId, name, url, now, now);
+            console.log(`[UDP Discovery] New peer discovered: ${name} (${url})`);
+          }
+        } catch {
+          // DB not ready — ignore
+        }
+      },
+    });
+
+    startSyncScheduler();
   }
 }

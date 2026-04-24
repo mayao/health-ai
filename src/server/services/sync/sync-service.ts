@@ -85,6 +85,26 @@ interface DiscoverPeerPayload {
   server_id?: string;
 }
 
+function isUnroutablePeerHost(host: string | undefined): boolean {
+  if (!host) return true;
+  const normalized = host.trim().toLowerCase();
+  return (
+    normalized === "0.0.0.0" ||
+    normalized === "::" ||
+    normalized === "::1" ||
+    normalized === "127.0.0.1" ||
+    normalized === "localhost"
+  );
+}
+
+function getUrlHost(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 function getLocalServerBaseUrl(): string {
   const port = Number(process.env.PORT ?? 3000);
   const host =
@@ -398,10 +418,16 @@ async function registerPeerByUrl(
   }
 
   const peerName = payload.name?.trim() || normalizedUrl;
+  const normalizedHost = getUrlHost(normalizedUrl);
   const peerBaseUrl =
-    payload.ip && payload.port
+    payload.ip && payload.port && !isUnroutablePeerHost(payload.ip)
       ? normalizePeerUrl(`http://${payload.ip}:${payload.port}/`)
-      : normalizedUrl;
+      : normalizedHost && !isUnroutablePeerHost(normalizedHost)
+        ? normalizedUrl
+        : "";
+  if (!peerBaseUrl) {
+    throw new Error("发现节点返回了不可路由地址，已拒绝注册");
+  }
   const now = new Date().toISOString();
 
   const existing = database

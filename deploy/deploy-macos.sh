@@ -39,7 +39,8 @@ echo "  ✅ 目录就绪"
 
 echo ""
 echo "▶ [3/4] 同步文件到远程..."
-rsync -az --delete .next/standalone/ "$TARGET:~/$REMOTE_DIR_NAME/.next/standalone/"
+# Do not overwrite runtime SQLite data on remote during code deploy.
+rsync -az --delete --exclude "data/" .next/standalone/ "$TARGET:~/$REMOTE_DIR_NAME/.next/standalone/"
 rsync -az --delete .next/static/ "$TARGET:~/$REMOTE_DIR_NAME/.next/static/"
 rsync -az --delete migrations/ "$TARGET:~/$REMOTE_DIR_NAME/migrations/"
 rsync -az --delete scripts/ "$TARGET:~/$REMOTE_DIR_NAME/scripts/"
