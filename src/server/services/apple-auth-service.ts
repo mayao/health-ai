@@ -1,6 +1,4 @@
 import { createPublicKey, verify as verifySignature, type JsonWebKey } from "node:crypto";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 
 import { getAppEnv } from "../config/env";
 
@@ -106,8 +104,6 @@ const APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys";
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_KEY_CACHE_TTL_MS = 10 * 60 * 1000;
 const APPLE_FETCH_TIMEOUT_MS = 5_000;
-const APPLE_CURL_TIMEOUT_SECONDS = 8;
-const execFileAsync = promisify(execFile);
 
 let cachedKeys:
   | {
@@ -145,10 +141,7 @@ function findCachedKey(kid: string, allowStale: boolean): AppleJWKSKey | undefin
   return cachedKeys.keys.find((key) => key.kid === kid);
 }
 
-async function requestAppleKeys(
-  fetcher: typeof fetch = fetch,
-  allowCurlFallback = fetcher === fetch
-): Promise<AppleJWKSKey[]> {
+async function requestAppleKeys(fetcher: typeof fetch = fetch): Promise<AppleJWKSKey[]> {
   let response: Response | null = null;
   let lastError: unknown;
   const maxAttempts = 2;
@@ -171,19 +164,6 @@ async function requestAppleKeys(
   }
 
   if (!response) {
-    if (allowCurlFallback) {
-      try {
-        const curlKeys = await requestAppleKeysViaCurl();
-        cachedKeys = {
-          fetchedAt: Date.now(),
-          keys: curlKeys
-        };
-        return curlKeys;
-      } catch {
-        // Fall through to structured AppleIdentityError below.
-      }
-    }
-
     const errorName = lastError instanceof Error ? lastError.name : "";
     if (errorName === "TimeoutError" || errorName === "AbortError") {
       throw new AppleIdentityError(
@@ -207,19 +187,6 @@ async function requestAppleKeys(
   }
 
   if (!response.ok) {
-    if (allowCurlFallback) {
-      try {
-        const curlKeys = await requestAppleKeysViaCurl();
-        cachedKeys = {
-          fetchedAt: Date.now(),
-          keys: curlKeys
-        };
-        return curlKeys;
-      } catch {
-        // Keep original upstream status in the structured error.
-      }
-    }
-
     throw new AppleIdentityError(
       "apple_keys_unavailable",
       `无法获取 Apple 公钥（${response.status}）`,
@@ -262,28 +229,6 @@ async function requestAppleKeys(
     fetchedAt: Date.now(),
     keys: payload.keys
   };
-
-  return payload.keys;
-}
-
-async function requestAppleKeysViaCurl(): Promise<AppleJWKSKey[]> {
-  const { stdout } = await execFileAsync("curl", [
-    "-fsSL",
-    "--max-time",
-    String(APPLE_CURL_TIMEOUT_SECONDS),
-    APPLE_KEYS_URL
-  ], { encoding: "utf8" });
-
-  let payload: AppleJWKSResponse;
-  try {
-    payload = JSON.parse(stdout) as AppleJWKSResponse;
-  } catch {
-    throw new Error("curl_apple_keys_invalid_json");
-  }
-
-  if (!payload.keys?.length) {
-    throw new Error("curl_apple_keys_empty");
-  }
 
   return payload.keys;
 }
@@ -357,10 +302,7 @@ export async function verifyAppleIdentityToken(
 
   if (!matchingKey) {
     try {
-      const keys = await requestAppleKeys(
-        options.fetcher,
-        options.fetcher === undefined
-      );
+      const keys = await requestAppleKeys(options.fetcher);
       matchingKey = keys.find((key) => key.kid === header.kid);
     } catch (error) {
       const staleKey = findCachedKey(header.kid, true);

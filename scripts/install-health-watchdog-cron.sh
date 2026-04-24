@@ -14,7 +14,6 @@ END_MARKER="# HEALTH_SERVER_WATCHDOG_END"
 
 BOOT_LINE="@reboot cd \"$PROJECT_DIR\" && \"$SCRIPT_DIR/start-health-server.sh\" >> \"$WATCHDOG_LOG\" 2>&1"
 CHECK_LINE="* * * * * cd \"$PROJECT_DIR\" && \"$SCRIPT_DIR/ensure-health-server.sh\" >> \"$WATCHDOG_LOG\" 2>&1"
-INGRESS_CHECK_LINE="* * * * * cd \"$PROJECT_DIR\" && \"$SCRIPT_DIR/ensure-public-ingress-healthy.sh\" >> \"$WATCHDOG_LOG\" 2>&1"
 
 CURRENT_CRON="$(crontab -l 2>/dev/null || true)"
 
@@ -29,7 +28,6 @@ FILTERED_CRON="$(printf "%s\n" "$CURRENT_CRON" | awk '
   echo "$BEGIN_MARKER"
   echo "$BOOT_LINE"
   echo "$CHECK_LINE"
-  echo "$INGRESS_CHECK_LINE"
   echo "$END_MARKER"
 } | sed '/^[[:space:]]*$/N;/^\n$/D' | crontab -
 

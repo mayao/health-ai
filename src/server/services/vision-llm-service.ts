@@ -114,14 +114,12 @@ async function callAnthropicVision(params: {
   prompt: string;
   imageBase64: string;
   mediaType: string;
-  baseUrl?: string;
   timeoutMs: number;
+  messagesUrl?: string;
   providerTag?: LLMProviderName;
 }): Promise<ProviderResult> {
-  const messageURL = resolveAnthropicMessagesUrl(
-    params.baseUrl ?? "https://api.anthropic.com/v1/messages"
-  );
-  const response = await fetch(messageURL, {
+  const url = params.messagesUrl ?? "https://api.anthropic.com/v1/messages";
+  const response = await fetch(url, {
     method: "POST",
     signal: AbortSignal.timeout(params.timeoutMs),
     headers: {
@@ -209,28 +207,17 @@ async function callProviderVision(
         prompt,
         imageBase64: payload.imageBase64,
         mediaType: payload.mediaType,
-        baseUrl: env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages",
         timeoutMs,
-        providerTag: "anthropic"
+        providerTag: "anthropic",
+        messagesUrl: env.HEALTH_LLM_BASE_URL
+          ? resolveAnthropicMessagesUrl(env.HEALTH_LLM_BASE_URL)
+          : undefined
       });
 
     case "kimi": {
       const kimiKey = process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
       if (!kimiKey) {
         throw new Error("kimi_not_configured");
-      }
-      const kimiBaseUrl = process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL;
-      if (kimiBaseUrl) {
-        return callAnthropicVision({
-          apiKey: kimiKey,
-          model: process.env.HEALTH_LLM_FALLBACK_KIMI_MODEL ?? "kimi-k2.5",
-          prompt,
-          imageBase64: payload.imageBase64,
-          mediaType: payload.mediaType,
-          baseUrl: kimiBaseUrl,
-          timeoutMs,
-          providerTag: "kimi"
-        });
       }
       const baseUrl = kimiKey.startsWith("sk-kimi-") ? "https://api.kimi.com/coding/v1" : "https://api.moonshot.cn/v1";
       const model =
@@ -251,24 +238,24 @@ async function callProviderVision(
     }
 
     case "minimax": {
-      const minimaxKey = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
-      const minimaxBaseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
-      if (!(minimaxKey && minimaxBaseUrl)) {
+      const mmKey = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
+      const mmBase = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
+      if (!(mmKey && mmBase)) {
         throw new Error("minimax_not_configured");
       }
-      const minimaxModel =
+      const model =
         process.env.HEALTH_LLM_FALLBACK_MINIMAX_VISION_MODEL ??
         process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ??
         "minimax-2.7-highspped";
       return callAnthropicVision({
-        apiKey: minimaxKey,
-        model: minimaxModel,
+        apiKey: mmKey,
+        model,
         prompt,
         imageBase64: payload.imageBase64,
         mediaType: payload.mediaType,
-        baseUrl: minimaxBaseUrl,
         timeoutMs,
-        providerTag: "minimax"
+        providerTag: "minimax",
+        messagesUrl: resolveAnthropicMessagesUrl(mmBase)
       });
     }
   }

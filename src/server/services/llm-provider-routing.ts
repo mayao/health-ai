@@ -23,14 +23,7 @@ export function getKimiOpenAIHeaders(apiKey?: string | null): Record<string, str
 export function isProviderConfigured(provider: LLMProviderName, env: AppEnv): boolean {
   switch (provider) {
     case "kimi":
-      return !!(
-        process.env.HEALTH_LLM_FALLBACK_KIMI_KEY &&
-        (
-          process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL ||
-          process.env.HEALTH_LLM_FALLBACK_KIMI_KEY.startsWith("sk-kimi-") ||
-          process.env.HEALTH_LLM_FALLBACK_KIMI_KEY.startsWith("sk-")
-        )
-      );
+      return !!process.env.HEALTH_LLM_FALLBACK_KIMI_KEY;
     case "minimax":
       return !!(
         process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY &&
@@ -112,11 +105,11 @@ function probeTargetFor(provider: LLMProviderName, env: AppEnv): string | null {
     }
     case "minimax":
       return process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL ?? null;
-    case "anthropic":
-      if (!isProviderConfigured("anthropic", env)) {
-        return null;
-      }
-      return resolveAnthropicMessagesUrl(env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages");
+    case "anthropic": {
+      if (!isProviderConfigured("anthropic", env)) return null;
+      const root = env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com";
+      return resolveAnthropicMessagesUrl(root);
+    }
     case "openai_compatible":
       return env.HEALTH_LLM_BASE_URL ?? null;
   }

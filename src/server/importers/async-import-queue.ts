@@ -87,7 +87,7 @@ async function runQueuedImport(job: QueueImportJobInput & { importTaskId: string
     const cacheType = job.importerKey === "annual_exam" || job.importerKey === "blood_test"
       ? "medical_exam" as const
       : job.importerKey === "genetic" ? "genetic" as const : undefined;
-    invalidateInsightCache(job.userId, cacheType, job.database);
+    invalidateInsightCache(job.userId, cacheType);
     deleteReportSnapshotsForUser(job.database, job.userId);
   } catch (error) {
     console.error(

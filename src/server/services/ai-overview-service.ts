@@ -2,7 +2,6 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { getAppEnv } from "../config/env";
 import { getDatabase } from "../db/sqlite";
-import { resolveAnthropicMessagesUrl } from "../llm/anthropic-messages-url";
 import { getHealthHomePageData } from "./health-home-service";
 
 export interface AIOverviewResult {
@@ -126,39 +125,6 @@ async function callKimiDirect(
   if (!kimiKey) return null;
 
   const model = process.env.HEALTH_LLM_FALLBACK_KIMI_MODEL ?? "kimi-latest";
-  const kimiBaseUrl = process.env.HEALTH_LLM_FALLBACK_KIMI_BASE_URL;
-  if (kimiBaseUrl) {
-    try {
-      const messageURL = resolveAnthropicMessagesUrl(kimiBaseUrl);
-      const response = await fetch(messageURL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": kimiKey,
-          Authorization: `Bearer ${kimiKey}`,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 2048,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }]
-        })
-      });
-
-      if (!response.ok) throw new Error(`Kimi API ${response.status}`);
-      const data = (await response.json()) as {
-        content?: Array<{ type: string; text?: string }>;
-        model?: string;
-      };
-      const text = data.content?.find((c) => c.type === "text")?.text?.trim();
-      if (text) return { text, provider: "kimi", model: data.model ?? model };
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.warn(`[AI Overview] Kimi(anthropic-gateway) failed: ${msg}`);
-    }
-  }
-
   const isKimiKey = kimiKey.startsWith("sk-kimi-");
   const baseUrl = isKimiKey ? "https://api.kimi.com/coding/v1" : "https://api.moonshot.cn/v1";
   const headers: Record<string, string> = {
@@ -213,25 +179,20 @@ async function callAnthropicDirect(
   userPrompt: string
 ): Promise<{ text: string; provider: string; model: string } | null> {
   const env = getAppEnv();
-  if (!env.HEALTH_LLM_API_KEY) return null;
-  if (env.HEALTH_LLM_PROVIDER && env.HEALTH_LLM_PROVIDER !== "anthropic") return null;
+  if (env.HEALTH_LLM_PROVIDER !== "anthropic" || !env.HEALTH_LLM_API_KEY) return null;
 
   const model = env.HEALTH_LLM_MODEL ?? "claude-sonnet-4-20250514";
-  const messageURL = resolveAnthropicMessagesUrl(
-    env.HEALTH_LLM_BASE_URL ?? "https://api.anthropic.com/v1/messages"
-  );
 
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 45_000);
 
-    const response = await fetch(messageURL, {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       signal: ctrl.signal,
       headers: {
         "Content-Type": "application/json",
         "x-api-key": env.HEALTH_LLM_API_KEY,
-        Authorization: `Bearer ${env.HEALTH_LLM_API_KEY}`,
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
@@ -254,48 +215,6 @@ async function callAnthropicDirect(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.warn(`[AI Overview] Anthropic failed: ${msg}`);
-  }
-  return null;
-}
-
-async function callMinimaxGatewayDirect(
-  systemPrompt: string,
-  userPrompt: string
-): Promise<{ text: string; provider: string; model: string } | null> {
-  const key = process.env.HEALTH_LLM_FALLBACK_MINIMAX_KEY;
-  const model = process.env.HEALTH_LLM_FALLBACK_MINIMAX_MODEL ?? "minimax-2.7-highspped";
-  const baseUrl = process.env.HEALTH_LLM_FALLBACK_MINIMAX_BASE_URL;
-  if (!(key && baseUrl)) return null;
-
-  const messageURL = resolveAnthropicMessagesUrl(baseUrl);
-
-  try {
-    const response = await fetch(messageURL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": key,
-        Authorization: `Bearer ${key}`,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 2048,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }]
-      })
-    });
-
-    if (!response.ok) throw new Error(`minimax API ${response.status}`);
-    const data = (await response.json()) as {
-      content?: Array<{ type: string; text?: string }>;
-      model?: string;
-    };
-    const text = data.content?.find((c) => c.type === "text")?.text?.trim();
-    if (text) return { text, provider: "minimax", model: data.model ?? model };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.warn(`[AI Overview] minimax failed: ${msg}`);
   }
   return null;
 }
@@ -339,7 +258,7 @@ function parseOverviewJSON(text: string): {
  * Uses caching (30 min TTL) and retry with fallback chain: Kimi → Anthropic → rule-based.
  */
 export async function generateAIOverview(
-  userId: string,
+  userId: string = "user-self",
   database: DatabaseSync = getDatabase()
 ): Promise<AIOverviewResult> {
   // Check cache first
@@ -351,15 +270,12 @@ export async function generateAIOverview(
   const payload = await getHealthHomePageData(database, userId);
   const userProfile = buildUserProfileForLLM(payload);
 
-  // Try Claude/Anthropic first, then Kimi, then MiniMax (Anthropic-compatible gateway).
+  // Try Kimi first, then Anthropic
   let llmResult: { text: string; provider: string; model: string } | null = null;
 
-  llmResult = await callAnthropicDirect(SYSTEM_PROMPT, userProfile);
+  llmResult = await callKimiDirect(SYSTEM_PROMPT, userProfile);
   if (!llmResult) {
-    llmResult = await callKimiDirect(SYSTEM_PROMPT, userProfile);
-  }
-  if (!llmResult) {
-    llmResult = await callMinimaxGatewayDirect(SYSTEM_PROMPT, userProfile);
+    llmResult = await callAnthropicDirect(SYSTEM_PROMPT, userProfile);
   }
 
   if (llmResult) {

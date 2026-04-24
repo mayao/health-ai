@@ -204,7 +204,7 @@ async function ensureReportSeries(
  */
 export function buildFallbackNarrative(
   database: DatabaseSync = getDatabase(),
-  userId: string,
+  userId: string = "user-self",
   options: ServiceClockOptions = {}
 ): HealthSummaryGenerationResult {
   const latestAsOf = resolveAnalysisAsOf(getLatestSampleTime(database, userId), options.now);
@@ -225,7 +225,7 @@ export function buildFallbackNarrative(
 
 export async function getCurrentDailySummary(
   database: DatabaseSync = getDatabase(),
-  userId: string,
+  userId: string = "user-self",
   options: ServiceClockOptions = {}
 ): Promise<HealthSummaryGenerationResult> {
   const latestAsOf = resolveAnalysisAsOf(getLatestSampleTime(database, userId), options.now);
@@ -249,7 +249,7 @@ export async function getCurrentDailySummary(
  */
 export async function getReportsIndexDataCached(
   database: DatabaseSync = getDatabase(),
-  userId: string,
+  userId: string = "user-self",
   _options: ServiceClockOptions = {}
 ): Promise<ReportsIndexData> {
   const weeklyReports = listSavedReportSnapshots(database, userId, "weekly").slice(0, 4);
@@ -264,7 +264,7 @@ export async function getReportsIndexDataCached(
 
 export async function getReportsIndexData(
   database: DatabaseSync = getDatabase(),
-  userId: string,
+  userId: string = "user-self",
   options: ServiceClockOptions = {}
 ): Promise<ReportsIndexData> {
   const latestAsOf = resolveAnalysisAsOf(getLatestSampleTime(database, userId), options.now);
@@ -299,7 +299,7 @@ export async function getReportsIndexData(
 export async function getReportSnapshotDetail(
   snapshotId: string,
   database: DatabaseSync = getDatabase(),
-  userId: string
+  userId: string = "user-self"
 ): Promise<HealthReportSnapshotRecord | undefined> {
   const row = getUnifiedReportSnapshotById(database, userId, snapshotId);
   return row ? hydrateSnapshotRecord(row) : undefined;
@@ -307,7 +307,7 @@ export async function getReportSnapshotDetail(
 
 export function listSavedReportSnapshots(
   database: DatabaseSync = getDatabase(),
-  userId: string,
+  userId: string = "user-self",
   reportType?: ReportKind
 ): HealthReportSnapshotRecord[] {
   return listUnifiedReportSnapshots(database, userId, reportType)

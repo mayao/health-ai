@@ -9,6 +9,7 @@ import {
   ensureMetricDefinition,
   finalizeImportTask,
   insertImportRowLog,
+  markImportTaskFailed,
   makeTaskNoteEntries,
   upsertMetricRecord
 } from "../importers/import-task-support";
@@ -317,11 +318,31 @@ function normalizeSampleTime(value: string): string {
   throw new Error(`Invalid sample time: ${value}`);
 }
 
+function cleanupStaleHealthKitTasks(
+  database: DatabaseSync,
+  userId: string
+): void {
+  const staleTasks = database.prepare(`
+    SELECT id
+    FROM import_task
+    WHERE user_id = ?
+      AND task_type = 'healthkit_sync'
+      AND task_status = 'running'
+      AND started_at < datetime('now', '-30 minutes')
+    ORDER BY started_at ASC
+  `).all(userId) as Array<{ id: string }>;
+
+  for (const task of staleTasks) {
+    markImportTaskFailed(database, task.id, "stale_healthkit_sync_timeout");
+  }
+}
+
 export function syncHealthKitSamples(
   payload: HealthKitSyncRequestPayload | HealthKitSyncRequestWirePayload,
   database: DatabaseSync = getDatabase(),
   userId: string = "user-self"
 ): HealthKitSyncResult {
+  cleanupStaleHealthKitTasks(database, userId);
   const normalizedPayload = normalizeHealthKitSyncPayload(payload);
   const dataSourceId = ensureDataSource(database, userId, {
     sourceType: "apple_health",
