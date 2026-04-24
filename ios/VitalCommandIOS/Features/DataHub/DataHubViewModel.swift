@@ -427,8 +427,11 @@ enum HealthKitOfflineSyncEngine {
                 let client = try makeClient(urlString: targetURL, token: preferredToken)
                 let response = try await sync(pendingSamples: pendingSamples, using: client)
                 let task = try? await client.fetchImportTask(taskID: response.result.importTaskId).task
-                _ = try? await client.triggerSync()
-                _ = try? await client.triggerPlanCheck()
+                // Do not block the HealthKit sync UI on peer sync / plan check.
+                Task.detached {
+                    _ = try? await client.triggerSync()
+                    _ = try? await client.triggerPlanCheck()
+                }
 
                 return HealthKitPendingUpload(
                     serverURL: targetURL,

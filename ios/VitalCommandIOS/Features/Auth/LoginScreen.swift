@@ -37,9 +37,6 @@ struct LoginScreen: View {
             if serverReachable != true {
                 await discoverReachableServerIfNeeded()
             }
-            if serverReachable == true, !authManager.isAuthenticated {
-                await directLogin()
-            }
         }
         .onChange(of: settings.serverURLString) {
             serverReachable = nil
@@ -111,8 +108,8 @@ struct LoginScreen: View {
             welcomeSection
             serverStatusBanner
             errorBanner
-            deviceEntryButton
             appleLoginButton
+            deviceEntryButton
         }
         .padding(24)
         .background(
@@ -137,7 +134,7 @@ struct LoginScreen: View {
                 .font(.title3.weight(.semibold))
                 .foregroundColor(darkText)
 
-            Text("默认推荐先使用本机快速进入，确保联网后可秒级登录；Apple 账号绑定可在后续设置里完成。\nHealth AI 仅用于健康整理、趋势解释与生活方式建议，不替代医生诊断。")
+            Text("你可以先用 Apple 登录建立稳定账号，也可以先使用本机快速进入。\nHealth AI 仅用于健康整理、趋势解释与生活方式建议，不替代医生诊断。")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -273,20 +270,21 @@ struct LoginScreen: View {
     }
 
     private func isServerReachable(_ rawURL: String) async -> Bool {
-        let base = rawURL.hasSuffix("/") ? String(rawURL.dropLast()) : rawURL
-        guard let url = URL(string: "\(base)/api/auth/me") else {
+        let urlString = rawURL.hasSuffix("/")
+            ? rawURL + "api/health"
+            : rawURL + "/api/health"
+        guard let url = URL(string: urlString) else {
             return false
         }
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 5
         request.httpMethod = "GET"
-        request.setValue("HealthAI-iOS-LoginReachability", forHTTPHeaderField: "User-Agent")
 
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
             if let httpResponse = response as? HTTPURLResponse {
-                return (200...499).contains(httpResponse.statusCode)
+                return (200...299).contains(httpResponse.statusCode)
             }
             return false
         } catch {
@@ -304,14 +302,12 @@ struct LoginScreen: View {
             preferredCandidates.append(url)
         }
 
-        let normalizedPreferredCandidates = preferredCandidates
-            .map(normalizedServerURL)
-            .filter { !$0.isEmpty && $0 != currentURL }
-        let reachablePreferred = await reachableServerCandidates(normalizedPreferredCandidates)
-        if let matchedPreferred = normalizedPreferredCandidates.first(where: { reachablePreferred.contains($0) }) {
-            settings.serverURLString = matchedPreferred
-            serverReachable = true
-            return
+        for candidate in preferredCandidates.map(normalizedServerURL) where !candidate.isEmpty && candidate != currentURL {
+            if await isServerReachable(candidate) {
+                settings.serverURLString = candidate
+                serverReachable = true
+                return
+            }
         }
 
         discovery.startScanning()
@@ -321,34 +317,12 @@ struct LoginScreen: View {
         let discoveredURLs = discovery.discoveredServers.map(\.urlString)
         settings.rememberDiscoveredServerURLs(discoveredURLs)
 
-        let normalizedDiscovered = discoveredURLs
-            .map(normalizedServerURL)
-            .filter { !$0.isEmpty && $0 != currentURL }
-        let reachableDiscovered = await reachableServerCandidates(normalizedDiscovered)
-        if let matchedDiscovered = normalizedDiscovered.first(where: { reachableDiscovered.contains($0) }) {
-            settings.serverURLString = matchedDiscovered
-            serverReachable = true
-            return
-        }
-    }
-
-    private func reachableServerCandidates(_ candidates: [String]) async -> Set<String> {
-        await withTaskGroup(of: (String, Bool).self, returning: Set<String>.self) { group in
-            for candidate in candidates {
-                group.addTask {
-                    let reachable = await isServerReachable(candidate)
-                    return (candidate, reachable)
-                }
+        for candidate in discoveredURLs.map(normalizedServerURL) where !candidate.isEmpty && candidate != currentURL {
+            if await isServerReachable(candidate) {
+                settings.serverURLString = candidate
+                serverReachable = true
+                return
             }
-
-            var reachableCandidates = Set<String>()
-            for await (candidate, reachable) in group {
-                if reachable {
-                    reachableCandidates.insert(candidate)
-                }
-            }
-
-            return reachableCandidates
         }
     }
 
@@ -370,27 +344,14 @@ struct LoginScreen: View {
     private func directLogin() async {
         errorMessage = nil
         isLoggingIn = true
-        defer { isLoggingIn = false }
-
         do {
             try await authManager.deviceAutoLogin(using: settings)
             serverReachable = true
         } catch {
-            if await settings.recoverToAvailablePublicServer(after: error) {
-                do {
-                    try await authManager.deviceAutoLogin(using: settings)
-                    serverReachable = true
-                    return
-                } catch {
-                    serverReachable = false
-                    authManager.enterOfflineMode()
-                    return
-                }
-            }
-
             serverReachable = false
             authManager.enterOfflineMode()
         }
+        isLoggingIn = false
     }
 
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
@@ -417,21 +378,6 @@ struct LoginScreen: View {
                     try await authManager.signInWithApple(payload, using: settings)
                     serverReachable = true
                 } catch {
-                    if await settings.recoverToAvailablePublicServer(after: error) {
-                        do {
-                            let payload = try AppleAuthorizationPayload(credential: credential)
-                            try await authManager.signInWithApple(payload, using: settings)
-                            serverReachable = true
-                            return
-                        } catch {
-                            errorMessage = friendlyAppleSignInMessage(for: error)
-                            if case let HealthAPIClientError.server(statusCode, _) = error, statusCode >= 500 {
-                                serverReachable = false
-                            }
-                            return
-                        }
-                    }
-
                     errorMessage = friendlyAppleSignInMessage(for: error)
                     if case let HealthAPIClientError.server(statusCode, _) = error, statusCode >= 500 {
                         serverReachable = false
@@ -596,10 +542,6 @@ struct IntroOnboardingScreen: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .automatic))
                 .frame(height: 520)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    advanceSlide()
-                }
 
                 HStack(spacing: 8) {
                     ForEach(0..<slides.count, id: \.self) { index in
@@ -611,7 +553,13 @@ struct IntroOnboardingScreen: View {
                 }
 
                 Button(selection == slides.count - 1 ? "开始使用" : "下一步") {
-                    advanceSlide()
+                    if selection == slides.count - 1 {
+                        hasSeenOnboarding = true
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            selection += 1
+                        }
+                    }
                 }
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -639,16 +587,6 @@ struct IntroOnboardingScreen: View {
         .onAppear {
             iconPulse = true
             cardFloat = true
-        }
-    }
-
-    private func advanceSlide() {
-        if selection == slides.count - 1 {
-            hasSeenOnboarding = true
-        } else {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                selection += 1
-            }
         }
     }
 }

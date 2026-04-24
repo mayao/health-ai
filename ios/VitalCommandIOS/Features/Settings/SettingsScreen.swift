@@ -134,10 +134,6 @@ struct SettingsScreen: View {
                 }
             }
 
-            if currentUserCapabilities.canSwitchAccounts || currentUserCapabilities.canCreateTestUsers {
-                developerAccountSection
-            }
-
             Section {
                 Button(role: .destructive) {
                     showLogoutConfirmation = true
@@ -156,9 +152,6 @@ struct SettingsScreen: View {
                 await loadSyncStatus()
                 await checkAllServers()
                 await loadModelStatus()
-                if currentUserCapabilities.canSwitchAccounts || currentUserCapabilities.canCreateTestUsers {
-                    await loadUsers()
-                }
             }
         }
         .onReceive(discovery.$discoveredServers) { servers in
@@ -691,6 +684,7 @@ struct SettingsScreen: View {
             let client = try settings.makeClient(token: authManager.token)
             let response = try await client.switchUser(SwitchUserRequest(targetUserId: targetUserId))
             authManager.switchUser(token: response.token, user: response.user)
+            settings.authToken = response.token
             currentUserId = response.user.id
             settings.markHealthDataChanged()
         } catch {
@@ -710,6 +704,7 @@ struct SettingsScreen: View {
             )
             // Switch to the new user
             authManager.switchUser(token: response.token, user: response.user)
+            settings.authToken = response.token
             currentUserId = response.user.id
             settings.markHealthDataChanged()
             // Reload user list

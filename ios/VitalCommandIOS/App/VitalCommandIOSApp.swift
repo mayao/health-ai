@@ -37,6 +37,10 @@ struct VitalCommandIOSApp: App {
             .onChange(of: authManager.token) {
                 settings.authToken = authManager.token
             }
+            .onChange(of: authManager.currentUser?.id) {
+                // Force feature pages to reload when account context changes.
+                settings.markHealthDataChanged()
+            }
             .onChange(of: settings.serverURLString) {
                 // When server changes, try re-authenticating on the new server
                 Task {
@@ -46,7 +50,16 @@ struct VitalCommandIOSApp: App {
             }
             .onChange(of: scenePhase) {
                 if scenePhase == .active, authManager.isAuthenticated {
-                    autoSync.syncIfNeeded(settings: settings)
+                    Task {
+                        settings.authToken = authManager.token
+                        let previousUserId = authManager.currentUser?.id
+                        await authManager.validateSession(using: settings)
+                        let currentUserId = authManager.currentUser?.id
+                        if previousUserId != currentUserId {
+                            settings.markHealthDataChanged()
+                        }
+                        autoSync.syncIfNeeded(settings: settings)
+                    }
                 }
             }
             .task {
@@ -58,9 +71,9 @@ struct VitalCommandIOSApp: App {
                 if authManager.isAuthenticated {
                     autoSync.syncIfNeeded(settings: settings)
                 }
-                // Keep launch animation smooth without blocking login too long.
+                // Ensure splash shows for at least 2.5 seconds
                 let elapsed = Date().timeIntervalSince(splashStart)
-                let remaining = 1.0 - elapsed
+                let remaining = 2.5 - elapsed
                 if remaining > 0 {
                     try? await Task.sleep(for: .seconds(remaining))
                 }
